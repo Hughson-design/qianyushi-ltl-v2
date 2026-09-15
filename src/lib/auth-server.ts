@@ -28,11 +28,33 @@ function publishableKey() {
   return key;
 }
 
+// Only a genuine "the app_users table does not exist yet" response should ever
+// unlock the pre-login legacy/setup path. PostgREST reports that specific case
+// with code PGRST205 ("could not find the table in the schema cache"); a plain
+// Postgres connection would raise 42P01 (undefined_table) instead. Any other
+// failure (wrong secret key, RLS misconfiguration, a transient 5xx, rate
+// limiting, ...) must NOT be treated the same way, because getAppSession()
+// grants a full, unauthenticated administrator session whenever schema.ready
+// is false. Matching on those exact codes - instead of loosely checking
+// whether the error text happens to contain the string "app_users" - closes
+// off every case where an unrelated error could be misread as "not migrated
+// yet" and silently hand out admin access to anyone.
+function isSchemaMissingTableError(status: number, detail: string) {
+  if (status === 404) return true;
+  try {
+    const data = JSON.parse(detail);
+    const code = typeof data?.code === "string" ? data.code : "";
+    return code === "PGRST205" || code === "42P01";
+  } catch {
+    return false;
+  }
+}
+
 export async function authSchemaStatus() {
   const response = await supabaseRequest("app_users?select=user_id&limit=1");
   if (!response.ok) {
     const detail = await response.text();
-    if (response.status === 404 || detail.includes("app_users")) return { ready: false, hasUsers: false };
+    if (isSchemaMissingTableError(response.status, detail)) return { ready: false, hasUsers: false };
     throw new Error(detail || "Unable to check authentication setup.");
   }
   const rows = await response.json();

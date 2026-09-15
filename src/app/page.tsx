@@ -164,6 +164,8 @@ const initialItem: FreightItem = {
 };
 
 const services = ["Liftgate at pickup", "Liftgate at delivery", "Residential pickup", "Residential delivery", "Limited access", "Appointment delivery", "Overlength freight"];
+const primaryServiceOptions = ["Liftgate at pickup", "Residential pickup"];
+const secondaryServiceOptions = services.filter((service) => !primaryServiceOptions.includes(service));
 
 const chineseTranslations: Record<string, string> = {
   "WORKSPACE": "工作台", "ACCOUNT": "账户", "New quote": "新建报价", "Quotes": "报价", "Orders": "订单", "Address book": "地址簿", "Customers": "客户", "Deposit": "押金", "Settings": "设置", "Sign out": "退出登录",
@@ -247,6 +249,7 @@ export default function Home() {
   const [customersNotice, setCustomersNotice] = useState("");
   const [userPasswords, setUserPasswords] = useState<Record<string, string>>({});
   const [pendingBolQuote, setPendingBolQuote] = useState<SavedQuote | null>(null);
+  const [pendingConfirmation, setPendingConfirmation] = useState<{ title: string; message: string; confirmLabel: string; onConfirm: () => void } | null>(null);
   const [customerForm, setCustomerForm] = useState({ name: "", code: "", markupPercent: "0", minimumMarkup: "0", canSelfBook: true, userName: "", email: "", password: "" });
   const [userForm, setUserForm] = useState({ customerId: "", fullName: "", email: "", password: "", role: "customer" });
   const [bookingDetails, setBookingDetails] = useState({
@@ -270,6 +273,9 @@ export default function Home() {
   const [deposit, setDeposit] = useState(0);
 
   const tx = (english: string) => language === "zh" ? chineseTranslations[english] || english : english;
+  function requestConfirmation(title: string, message: string, confirmLabel: string, onConfirm: () => void) {
+    setPendingConfirmation({ title, message, confirmLabel, onConfirm });
+  }
   const statusLabel = (status: string) => language === "zh" ? ({ draft: "草稿", booking: "下单中", booked: "已生成 BOL", void: "已取消" }[status] || status) : status;
   const helpItems = language === "zh" ? [
     { title: "1. 智能报价", body: "第一行粘贴发货地址，第二行粘贴收货地址，第三行起每行填写一项货物。点击“帮我填写”后，请检查系统识别的地址、附加服务和货物资料。" },
@@ -479,8 +485,16 @@ export default function Home() {
     setAddressBookTarget(null);
   }
 
-  async function deleteAddress(entry: AddressBookEntry) {
-    if (!window.confirm(`Delete ${entry.company} from the address book?`)) return;
+  function deleteAddress(entry: AddressBookEntry) {
+    requestConfirmation(
+      language === "zh" ? "删除地址" : "Delete address",
+      language === "zh" ? `确认从地址簿删除 ${entry.company}？` : `Delete ${entry.company} from the address book?`,
+      tx("Delete"),
+      () => void performDeleteAddress(entry),
+    );
+  }
+
+  async function performDeleteAddress(entry: AddressBookEntry) {
     setDeletingAddressId(entry.id);
     setAddressBookError("");
     try {
@@ -805,8 +819,16 @@ export default function Home() {
     }
   }
 
-  async function deleteCustomer(customer: Customer) {
-    if (!window.confirm(`Delete ${customer.name}? Only an empty customer workspace can be deleted.`)) return;
+  function deleteCustomer(customer: Customer) {
+    requestConfirmation(
+      language === "zh" ? "删除客户" : "Delete customer",
+      language === "zh" ? `确认删除 ${customer.name}？只有没有任何数据的客户工作区才能被删除。` : `Delete ${customer.name}? Only an empty customer workspace can be deleted.`,
+      tx("Delete"),
+      () => void performDeleteCustomer(customer),
+    );
+  }
+
+  async function performDeleteCustomer(customer: Customer) {
     setCustomersLoading(true);
     setCustomersError("");
     try {
@@ -820,8 +842,16 @@ export default function Home() {
     }
   }
 
-  async function deleteUser(user: Customer["app_users"][number]) {
-    if (!window.confirm(`Delete login user ${user.full_name} (${user.email})? This immediately removes login access.`)) return;
+  function deleteUser(user: Customer["app_users"][number]) {
+    requestConfirmation(
+      language === "zh" ? "删除登录用户" : "Delete login user",
+      language === "zh" ? `确认删除登录用户 ${user.full_name}（${user.email}）？该操作会立即撤销此用户的登录权限。` : `Delete login user ${user.full_name} (${user.email})? This immediately removes login access.`,
+      tx("Delete"),
+      () => void performDeleteUser(user),
+    );
+  }
+
+  async function performDeleteUser(user: Customer["app_users"][number]) {
     setCustomersLoading(true);
     setCustomersError("");
     try {
@@ -877,8 +907,18 @@ export default function Home() {
     setPendingBolQuote(quote);
   }
 
-  async function voidShipment(quote: SavedQuote) {
-    if (!window.confirm(`Void ${quote.quote_number}? If the carrier confirms cancellation, the shipment and pickup will be cancelled and $${Number(quote.price).toFixed(2)} will be returned to the deposit.`)) return;
+  function voidShipment(quote: SavedQuote) {
+    requestConfirmation(
+      tx("Void shipment"),
+      language === "zh"
+        ? `确认取消 ${quote.quote_number}？如果承运商确认取消，运单和 Pickup 将被取消，$${Number(quote.price).toFixed(2)} 将退回押金。`
+        : `Void ${quote.quote_number}? If the carrier confirms cancellation, the shipment and pickup will be cancelled and $${Number(quote.price).toFixed(2)} will be returned to the deposit.`,
+      tx("Void shipment"),
+      () => void performVoidShipment(quote),
+    );
+  }
+
+  async function performVoidShipment(quote: SavedQuote) {
     setQuoteActionId(quote.id);
     setSavedQuotesError("");
     setSavedQuotesNotice("");
@@ -896,12 +936,27 @@ export default function Home() {
     }
   }
 
-  async function saveBookingDetails(event: FormEvent) {
+  function saveBookingDetails(event: FormEvent) {
     event.preventDefault();
     if (selectedRate === null || !rates[selectedRate]) return;
+    const rate = rates[selectedRate];
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const generateAfterSaving = submitter?.value === "generate";
-    if (generateAfterSaving && !window.confirm(`Generate the BOL and schedule carrier pickup? $${selectedPrice.toFixed(2)} will be deducted from the deposit.`)) return;
+    if (generateAfterSaving) {
+      requestConfirmation(
+        tx("Generate BOL"),
+        language === "zh"
+          ? `生成 BOL 并预约承运商 Pickup？将从押金扣除 $${selectedPrice.toFixed(2)}。`
+          : `Generate the BOL and schedule carrier pickup? $${selectedPrice.toFixed(2)} will be deducted from the deposit.`,
+        language === "zh" ? "确认生成" : "Confirm and generate",
+        () => void performSaveBookingDetails(rate, true),
+      );
+      return;
+    }
+    void performSaveBookingDetails(rate, false);
+  }
+
+  async function performSaveBookingDetails(rate: Rate, generateAfterSaving: boolean) {
     setSavingBooking(true);
     setBookingMessage("");
     try {
@@ -912,7 +967,7 @@ export default function Home() {
           originZip: origin,
           destinationZip: destination,
           readyDate,
-          rate: rates[selectedRate],
+          rate,
           items: items.map((item) => ({
             ...item,
             totalWeight: Math.round((Number(item.pallets) || 0) * (Number(item.unitWeight) || 0)),
@@ -1159,7 +1214,12 @@ export default function Home() {
             <section className="panel services-panel">
               <div className="section-title services-title"><span>3</span><div><h2>{tx("Additional services")}</h2></div></div>
               <div className="service-grid">
-                {services.map((service) => <label className={`service-option ${selectedServices.includes(service) ? "selected" : ""}`} key={service}><input type="checkbox" checked={selectedServices.includes(service)} onChange={() => toggleService(service)} /><span>{tx(service)}</span></label>)}
+                <div className="service-row">
+                  {primaryServiceOptions.map((service) => <label className={`service-option ${selectedServices.includes(service) ? "selected" : ""}`} key={service}><input type="checkbox" checked={selectedServices.includes(service)} onChange={() => toggleService(service)} /><span>{tx(service)}</span></label>)}
+                </div>
+                <div className="service-row">
+                  {secondaryServiceOptions.map((service) => <label className={`service-option ${selectedServices.includes(service) ? "selected" : ""}`} key={service}><input type="checkbox" checked={selectedServices.includes(service)} onChange={() => toggleService(service)} /><span>{tx(service)}</span></label>)}
+                </div>
               </div>
             </section>
 
@@ -1340,6 +1400,18 @@ export default function Home() {
             </header>
             <p>{language === "zh" ? `系统将生成 BOL、向承运商预约 Pickup，并从押金扣除 $${Number(pendingBolQuote.price).toFixed(2)}。` : `A BOL will be generated, carrier pickup will be scheduled, and $${Number(pendingBolQuote.price).toFixed(2)} will be deducted from the deposit.`}</p>
             <footer><button type="button" className="secondary-action" onClick={() => setPendingBolQuote(null)}>{language === "zh" ? "取消" : "Cancel"}</button><button type="button" onClick={() => { const quoteId = pendingBolQuote.id; setPendingBolQuote(null); void generateBol(quoteId); }}>{language === "zh" ? "确认生成" : "Confirm and generate"}</button></footer>
+          </section>
+        </div>
+      )}
+      {pendingConfirmation && (
+        <div className="address-book-backdrop" role="presentation" onMouseDown={() => setPendingConfirmation(null)}>
+          <section className="help-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title" onMouseDown={(event) => event.stopPropagation()}>
+            <header>
+              <div><p className="eyebrow">{language === "zh" ? "请确认" : "PLEASE CONFIRM"}</p><h2 id="confirm-dialog-title">{pendingConfirmation.title}</h2></div>
+              <button type="button" onClick={() => setPendingConfirmation(null)} aria-label={language === "zh" ? "关闭确认" : "Close confirmation"}>×</button>
+            </header>
+            <p>{pendingConfirmation.message}</p>
+            <footer><button type="button" className="secondary-action" onClick={() => setPendingConfirmation(null)}>{language === "zh" ? "取消" : "Cancel"}</button><button type="button" onClick={() => { const action = pendingConfirmation.onConfirm; setPendingConfirmation(null); action(); }}>{pendingConfirmation.confirmLabel}</button></footer>
           </section>
         </div>
       )}

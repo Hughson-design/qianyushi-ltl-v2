@@ -36,14 +36,25 @@ export async function POST(request: Request) {
   try {
     const auth = await requireAdminSession();
     if (auth.response || !auth.session) return auth.response;
+    // adjust_deposit_balance also has a legacy two-argument overload (no
+    // p_customer_id) that only ever touches the original single-tenant
+    // QIANYUSHI deposit row. Without this check, an Admin/Operations user who
+    // forgot to select a customer first would silently adjust that internal
+    // account instead of getting an error telling them to pick a customer.
+    if (!auth.session.customerId) {
+      return NextResponse.json({ error: "Select a customer before adjusting its deposit balance." }, { status: 400 });
+    }
     const body = await request.json();
     const amount = Number(body.amount);
     const reason = String(body.reason || "").trim();
     if (!Number.isFinite(amount) || amount === 0) return NextResponse.json({ error: "Enter a non-zero deposit amount." }, { status: 400 });
     if (!reason) return NextResponse.json({ error: "A payment reference or adjustment reason is required." }, { status: 400 });
-    const response = await supabaseRpc("adjust_deposit_balance", auth.session.customerId
-      ? { p_customer_id: auth.session.customerId, p_amount: amount, p_reason: reason, p_actor_user_id: auth.session.userId }
-      : { p_amount: amount, p_reason: reason });
+    const response = await supabaseRpc("adjust_deposit_balance", {
+      p_customer_id: auth.session.customerId,
+      p_amount: amount,
+      p_reason: reason,
+      p_actor_user_id: auth.session.userId,
+    });
     if (!response.ok) return NextResponse.json({ error: await responseError(response, "Unable to adjust the deposit balance. Run the latest Supabase SQL first.") }, { status: 503 });
     return NextResponse.json({ availableBalance: Number(await response.json()) });
   } catch (error) {
