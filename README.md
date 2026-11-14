@@ -27,6 +27,13 @@ Shenzhen Qianyushi Supply Chain Service Co., Ltd. 的轻量化美国 LTL 询价�
 - Priority1 按 Reference 查重和异常响应恢复，防止重复创建运单。
 - Orders、Quotes、Address Book、Deposit、Customers、Settings 和 Help 页面。
 
+## 报价界面更新（2026-11-14）
+
+- 询价结果按现有排序显示前 5 条，统一使用单列列表。每条报价左侧用 P（Priority1）、T（TQL）或 W（WWEX）标明报价平台。
+- 报价金额左侧显示预计运输天数（Transit days），手机端也可查看。承运商未返回时效时显示「未提供」。
+- 首次打开询价页面时，READY DATE (PT) 默认填入美国太平洋时间的当天，自动适用冬令时和夏令时，可手动修改。询价及下单表单均标注时区。
+- 双击报价行可打开该报价的下单表单。也可单击选择报价，再点「继续填写下单资料」。打开表单后仍需手动提交。
+
 ## 技术栈
 
 - Next.js 16 App Router
