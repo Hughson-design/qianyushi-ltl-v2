@@ -1188,8 +1188,8 @@ export default function Home() {
             <section className="rates-section" id="rates">
               <div className="rates-heading"><div><p className="eyebrow">{tx("QUOTE RESULTS")}</p><h2>{tx("Choose a rate")}</h2><p>{origin} → {destination}</p></div><span>{language === "zh" ? `找到 ${rates.length} 个报价` : `${rates.length} rates found`}</span></div>
               <div className="rate-list">
-                {rates.map((rate, index) => (
-                  <button type="button" className={`rate-card ${selectedRate === index ? "selected" : ""}`} key={`${rate.provider}-${rate.carrier}-${rate.price}`} onClick={() => { setSelectedRate(index); setBookingOpen(false); }}>
+                {rates.slice(0, 5).map((rate, index) => (
+                  <button type="button" className={`rate-card ${selectedRate === index ? "selected" : ""}`} key={`${rate.provider}-${rate.carrier}-${rate.price}`} onClick={() => { setSelectedRate(index); setBookingOpen(false); }} onDoubleClick={() => { setSelectedRate(index); openBooking(); }}>
                     <span className="rate-provider" aria-hidden="true">{rate.provider?.[0].toUpperCase()}</span><span className="radio"><i /></span><span className="carrier"><strong>{rate.carrier}</strong><small>{rate.service}</small></span><span className="transit"><small>{tx("Transit days")}</small><strong>{language === "zh" ? tx(rate.transit).replace(/^(\d+) days?$/, "$1 天") : rate.transit}</strong></span>{rate.badge && <span className="rate-badge">{tx(rate.badge)}</span>}<span className="price"><strong>${rate.price.toFixed(2)}</strong><small>{tx("Customer price")}</small></span>
                   </button>
                 ))}
