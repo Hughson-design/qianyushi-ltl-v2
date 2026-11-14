@@ -405,6 +405,9 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .quotes-success { color: var(--green); background: var(--green-soft); border: 1px solid #c8dfd4; }
 .quote-actions { min-width: 120px; display: flex; flex-direction: column; align-items: stretch; gap: 5px; }
 .quote-actions button, .quote-actions a { min-height: 30px; padding: 7px 9px; border: 0; border-radius: 6px; color: white; background: var(--green); font-size: 9px; font-weight: 800; text-align: center; text-decoration: none; }
+.order-actions { flex-direction: row; align-items: flex-start; width: max-content; }
+.order-actions summary { padding: 7px 9px; min-height: 30px; border-radius: 6px; color: var(--green); background: var(--green-soft); cursor: pointer; font-size: 9px; font-weight: 800; white-space: nowrap; }
+.order-action-options { display: grid; gap: 5px; margin-top: 5px; }
 .quote-actions .void-button { color: #8b3d38; background: #f9e5e3; }
 .quote-actions .secondary-action { color: var(--green); background: var(--green-soft); }
 .quote-actions button:disabled { cursor: wait; opacity: .6; }
