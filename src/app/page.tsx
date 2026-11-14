@@ -24,7 +24,7 @@ type Rate = {
   transit: string;
   price: number;
   badge?: string;
-  provider?: "wwex" | "priority1";
+  provider?: "wwex" | "priority1" | "tql";
   providerRef?: Record<string, string | number>;
 };
 
@@ -40,7 +40,7 @@ type SavedQuote = {
   service: string;
   transit: string;
   price: number | string;
-  provider: "priority1" | "wwex";
+  provider: "priority1" | "wwex" | "tql";
   receiver: BookingParty;
   sender: BookingParty;
   freight_items: Array<FreightItem & { totalWeight?: number; freightClass?: string }>;
@@ -120,6 +120,7 @@ type PlatformSettings = {
   minimum_markup: number;
   wwex_enabled: boolean;
   priority1_enabled: boolean;
+  tql_enabled: boolean;
 };
 
 const blankBookingParty: BookingParty = {
@@ -164,8 +165,6 @@ const initialItem: FreightItem = {
 };
 
 const services = ["Liftgate at pickup", "Liftgate at delivery", "Residential pickup", "Residential delivery", "Limited access", "Appointment delivery", "Overlength freight"];
-const primaryServiceOptions = ["Liftgate at pickup", "Residential pickup"];
-const secondaryServiceOptions = services.filter((service) => !primaryServiceOptions.includes(service));
 
 const chineseTranslations: Record<string, string> = {
   "WORKSPACE": "工作台", "ACCOUNT": "账户", "New quote": "新建报价", "Quotes": "报价", "Orders": "订单", "Address book": "地址簿", "Customers": "客户", "Deposit": "押金", "Settings": "设置", "Sign out": "退出登录",
@@ -239,6 +238,7 @@ export default function Home() {
     minimum_markup: 0,
     wwex_enabled: true,
     priority1_enabled: true,
+    tql_enabled: false,
   });
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState("");
@@ -249,7 +249,6 @@ export default function Home() {
   const [customersNotice, setCustomersNotice] = useState("");
   const [userPasswords, setUserPasswords] = useState<Record<string, string>>({});
   const [pendingBolQuote, setPendingBolQuote] = useState<SavedQuote | null>(null);
-  const [pendingConfirmation, setPendingConfirmation] = useState<{ title: string; message: string; confirmLabel: string; onConfirm: () => void } | null>(null);
   const [customerForm, setCustomerForm] = useState({ name: "", code: "", markupPercent: "0", minimumMarkup: "0", canSelfBook: true, userName: "", email: "", password: "" });
   const [userForm, setUserForm] = useState({ customerId: "", fullName: "", email: "", password: "", role: "customer" });
   const [bookingDetails, setBookingDetails] = useState({
@@ -273,9 +272,6 @@ export default function Home() {
   const [deposit, setDeposit] = useState(0);
 
   const tx = (english: string) => language === "zh" ? chineseTranslations[english] || english : english;
-  function requestConfirmation(title: string, message: string, confirmLabel: string, onConfirm: () => void) {
-    setPendingConfirmation({ title, message, confirmLabel, onConfirm });
-  }
   const statusLabel = (status: string) => language === "zh" ? ({ draft: "草稿", booking: "下单中", booked: "已生成 BOL", void: "已取消" }[status] || status) : status;
   const helpItems = language === "zh" ? [
     { title: "1. 智能报价", body: "第一行粘贴发货地址，第二行粘贴收货地址，第三行起每行填写一项货物。点击“帮我填写”后，请检查系统识别的地址、附加服务和货物资料。" },
@@ -485,16 +481,8 @@ export default function Home() {
     setAddressBookTarget(null);
   }
 
-  function deleteAddress(entry: AddressBookEntry) {
-    requestConfirmation(
-      language === "zh" ? "删除地址" : "Delete address",
-      language === "zh" ? `确认从地址簿删除 ${entry.company}？` : `Delete ${entry.company} from the address book?`,
-      tx("Delete"),
-      () => void performDeleteAddress(entry),
-    );
-  }
-
-  async function performDeleteAddress(entry: AddressBookEntry) {
+  async function deleteAddress(entry: AddressBookEntry) {
+    if (!window.confirm(`Delete ${entry.company} from the address book?`)) return;
     setDeletingAddressId(entry.id);
     setAddressBookError("");
     try {
@@ -819,16 +807,8 @@ export default function Home() {
     }
   }
 
-  function deleteCustomer(customer: Customer) {
-    requestConfirmation(
-      language === "zh" ? "删除客户" : "Delete customer",
-      language === "zh" ? `确认删除 ${customer.name}？只有没有任何数据的客户工作区才能被删除。` : `Delete ${customer.name}? Only an empty customer workspace can be deleted.`,
-      tx("Delete"),
-      () => void performDeleteCustomer(customer),
-    );
-  }
-
-  async function performDeleteCustomer(customer: Customer) {
+  async function deleteCustomer(customer: Customer) {
+    if (!window.confirm(`Delete ${customer.name}? Only an empty customer workspace can be deleted.`)) return;
     setCustomersLoading(true);
     setCustomersError("");
     try {
@@ -842,16 +822,8 @@ export default function Home() {
     }
   }
 
-  function deleteUser(user: Customer["app_users"][number]) {
-    requestConfirmation(
-      language === "zh" ? "删除登录用户" : "Delete login user",
-      language === "zh" ? `确认删除登录用户 ${user.full_name}（${user.email}）？该操作会立即撤销此用户的登录权限。` : `Delete login user ${user.full_name} (${user.email})? This immediately removes login access.`,
-      tx("Delete"),
-      () => void performDeleteUser(user),
-    );
-  }
-
-  async function performDeleteUser(user: Customer["app_users"][number]) {
+  async function deleteUser(user: Customer["app_users"][number]) {
+    if (!window.confirm(`Delete login user ${user.full_name} (${user.email})? This immediately removes login access.`)) return;
     setCustomersLoading(true);
     setCustomersError("");
     try {
@@ -907,18 +879,8 @@ export default function Home() {
     setPendingBolQuote(quote);
   }
 
-  function voidShipment(quote: SavedQuote) {
-    requestConfirmation(
-      tx("Void shipment"),
-      language === "zh"
-        ? `确认取消 ${quote.quote_number}？如果承运商确认取消，运单和 Pickup 将被取消，$${Number(quote.price).toFixed(2)} 将退回押金。`
-        : `Void ${quote.quote_number}? If the carrier confirms cancellation, the shipment and pickup will be cancelled and $${Number(quote.price).toFixed(2)} will be returned to the deposit.`,
-      tx("Void shipment"),
-      () => void performVoidShipment(quote),
-    );
-  }
-
-  async function performVoidShipment(quote: SavedQuote) {
+  async function voidShipment(quote: SavedQuote) {
+    if (!window.confirm(`Void ${quote.quote_number}? If the carrier confirms cancellation, the shipment and pickup will be cancelled and $${Number(quote.price).toFixed(2)} will be returned to the deposit.`)) return;
     setQuoteActionId(quote.id);
     setSavedQuotesError("");
     setSavedQuotesNotice("");
@@ -936,27 +898,12 @@ export default function Home() {
     }
   }
 
-  function saveBookingDetails(event: FormEvent) {
+  async function saveBookingDetails(event: FormEvent) {
     event.preventDefault();
     if (selectedRate === null || !rates[selectedRate]) return;
-    const rate = rates[selectedRate];
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const generateAfterSaving = submitter?.value === "generate";
-    if (generateAfterSaving) {
-      requestConfirmation(
-        tx("Generate BOL"),
-        language === "zh"
-          ? `生成 BOL 并预约承运商 Pickup？将从押金扣除 $${selectedPrice.toFixed(2)}。`
-          : `Generate the BOL and schedule carrier pickup? $${selectedPrice.toFixed(2)} will be deducted from the deposit.`,
-        language === "zh" ? "确认生成" : "Confirm and generate",
-        () => void performSaveBookingDetails(rate, true),
-      );
-      return;
-    }
-    void performSaveBookingDetails(rate, false);
-  }
-
-  async function performSaveBookingDetails(rate: Rate, generateAfterSaving: boolean) {
+    if (generateAfterSaving && !window.confirm(`Generate the BOL and schedule carrier pickup? $${selectedPrice.toFixed(2)} will be deducted from the deposit.`)) return;
     setSavingBooking(true);
     setBookingMessage("");
     try {
@@ -967,7 +914,7 @@ export default function Home() {
           originZip: origin,
           destinationZip: destination,
           readyDate,
-          rate,
+          rate: rates[selectedRate],
           items: items.map((item) => ({
             ...item,
             totalWeight: Math.round((Number(item.pallets) || 0) * (Number(item.unitWeight) || 0)),
@@ -1031,9 +978,9 @@ export default function Home() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to get rates.");
 
-      const normalized: Rate[] = data.rates.map((rate: { provider: "wwex" | "priority1"; carrier: string; service: string; transitDays: number | null; price: number; providerRef: Record<string, string | number> }) => ({
+      const normalized: Rate[] = data.rates.map((rate: { provider: "wwex" | "priority1" | "tql"; carrier: string; service: string; transitDays: number | null; price: number; providerRef: Record<string, string | number> }) => ({
         carrier: rate.carrier,
-        service: `${rate.provider === "wwex" ? "WWEX" : "Priority1"} · ${rate.service}`,
+        service: `${rate.provider === "wwex" ? "WWEX" : rate.provider === "tql" ? "TQL" : "Priority1"} · ${rate.service}`,
         transit: rate.transitDays ? `${rate.transitDays} ${rate.transitDays === 1 ? "day" : "days"}` : "Not provided",
         price: rate.price,
         provider: rate.provider,
@@ -1214,12 +1161,7 @@ export default function Home() {
             <section className="panel services-panel">
               <div className="section-title services-title"><span>3</span><div><h2>{tx("Additional services")}</h2></div></div>
               <div className="service-grid">
-                <div className="service-row">
-                  {primaryServiceOptions.map((service) => <label className={`service-option ${selectedServices.includes(service) ? "selected" : ""}`} key={service}><input type="checkbox" checked={selectedServices.includes(service)} onChange={() => toggleService(service)} /><span>{tx(service)}</span></label>)}
-                </div>
-                <div className="service-row">
-                  {secondaryServiceOptions.map((service) => <label className={`service-option ${selectedServices.includes(service) ? "selected" : ""}`} key={service}><input type="checkbox" checked={selectedServices.includes(service)} onChange={() => toggleService(service)} /><span>{tx(service)}</span></label>)}
-                </div>
+                {services.map((service) => <label className={`service-option ${selectedServices.includes(service) ? "selected" : ""}`} key={service}><input type="checkbox" checked={selectedServices.includes(service)} onChange={() => toggleService(service)} /><span>{tx(service)}</span></label>)}
               </div>
             </section>
 
@@ -1233,7 +1175,7 @@ export default function Home() {
               <div className="rate-list">
                 {rates.map((rate, index) => (
                   <button type="button" className={`rate-card ${selectedRate === index ? "selected" : ""}`} key={`${rate.provider}-${rate.carrier}-${rate.price}`} onClick={() => { setSelectedRate(index); setBookingOpen(false); }}>
-                    <span className="radio"><i /></span><span className="carrier-logo">{rate.carrier.slice(0, 2).toUpperCase()}</span><span className="carrier"><strong>{rate.carrier}</strong><small>{rate.service}</small></span><span className="transit"><small>{tx("Estimated transit")}</small><strong>{rate.transit}</strong></span>{rate.badge && <span className="rate-badge">{tx(rate.badge)}</span>}<span className="price"><strong>${rate.price.toFixed(2)}</strong><small>{tx("Customer price")}</small></span>
+                    <span className="rate-provider" aria-hidden="true">{rate.provider?.[0].toUpperCase()}</span><span className="radio"><i /></span><span className="carrier"><strong>{rate.carrier}</strong><small>{rate.service}</small></span><span className="transit"><small>{tx("Estimated transit")}</small><strong>{rate.transit}</strong></span>{rate.badge && <span className="rate-badge">{tx(rate.badge)}</span>}<span className="price"><strong>${rate.price.toFixed(2)}</strong><small>{tx("Customer price")}</small></span>
                   </button>
                 ))}
               </div>
@@ -1364,7 +1306,7 @@ export default function Home() {
 
         <div className="content workspace-page" hidden={view !== "settings"}>
           <section className="page-heading"><div><p className="eyebrow">{tx("PLATFORM DEFAULTS")}</p><h1>{tx("Settings")}</h1><p>{tx("These defaults are applied when preparing new bookings.")}</p></div></section>
-          <section className="panel settings-panel">{settingsError && <p className="quotes-error" role="alert">{settingsError}</p>}{settingsLoading && !settings.company_name ? <p className="quotes-empty">{language === "zh" ? "正在加载设置…" : "Loading settings…"}</p> : <form onSubmit={saveSettings} className="settings-form"><label>{tx("Company name")}<input required value={settings.company_name} onChange={(event) => setSettings((current) => ({ ...current, company_name: event.target.value }))} /></label><div className="settings-two"><label>{tx("Default contact")}<input value={settings.contact_name} onChange={(event) => setSettings((current) => ({ ...current, contact_name: event.target.value }))} /></label><label>{tx("Phone")}<input value={settings.phone} onChange={(event) => setSettings((current) => ({ ...current, phone: event.target.value }))} /></label></div><label>{tx("Email")}<input type="email" value={settings.email} onChange={(event) => setSettings((current) => ({ ...current, email: event.target.value }))} /></label><div className="settings-two"><label>{tx("Default ready time")}<input type="time" value={settings.default_ready_time} onChange={(event) => setSettings((current) => ({ ...current, default_ready_time: event.target.value }))} /></label><label>{tx("Default close time")}<input type="time" value={settings.default_close_time} onChange={(event) => setSettings((current) => ({ ...current, default_close_time: event.target.value }))} /></label></div><div className="settings-section"><h2>{tx("Customer pricing")}</h2><p>{language === "zh" ? "显示价格为承运商成本加上百分比加价或最低加价中较高的一项。" : "The displayed rate is carrier cost plus the greater of percentage markup or minimum markup."}</p><div className="settings-two"><label>{tx("Markup percent")}<input type="number" min="0" step="0.01" value={settings.markup_percent} onChange={(event) => setSettings((current) => ({ ...current, markup_percent: Number(event.target.value) }))} /></label><label>{tx("Minimum markup (USD)")}<input type="number" min="0" step="0.01" value={settings.minimum_markup} onChange={(event) => setSettings((current) => ({ ...current, minimum_markup: Number(event.target.value) }))} /></label></div></div><div className="settings-section"><h2>{tx("Rate providers")}</h2><div className="provider-toggles"><label><input type="checkbox" checked={settings.wwex_enabled} onChange={(event) => setSettings((current) => ({ ...current, wwex_enabled: event.target.checked }))} /><span><strong>WWEX</strong><small>{language === "zh" ? "包含 WWEX 沙盒报价" : "Include WWEX sandbox rates"}</small></span></label><label><input type="checkbox" checked={settings.priority1_enabled} onChange={(event) => setSettings((current) => ({ ...current, priority1_enabled: event.target.checked }))} /><span><strong>Priority1</strong><small>{language === "zh" ? "包含 Priority1 沙盒报价" : "Include Priority1 sandbox rates"}</small></span></label></div></div><button type="submit" disabled={settingsLoading || (!settings.wwex_enabled && !settings.priority1_enabled)}>{settingsLoading ? tx("Please wait…") : tx("Save settings")}</button>{!settings.wwex_enabled && !settings.priority1_enabled && <small className="settings-warning">{language === "zh" ? "请至少启用一个报价渠道。" : "Keep at least one rate provider enabled."}</small>}</form>}{settingsMessage && <p className="settings-success" role="status">{settingsMessage}</p>}</section>
+          <section className="panel settings-panel">{settingsError && <p className="quotes-error" role="alert">{settingsError}</p>}{settingsLoading && !settings.company_name ? <p className="quotes-empty">{language === "zh" ? "正在加载设置…" : "Loading settings…"}</p> : <form onSubmit={saveSettings} className="settings-form"><label>{tx("Company name")}<input required value={settings.company_name} onChange={(event) => setSettings((current) => ({ ...current, company_name: event.target.value }))} /></label><div className="settings-two"><label>{tx("Default contact")}<input value={settings.contact_name} onChange={(event) => setSettings((current) => ({ ...current, contact_name: event.target.value }))} /></label><label>{tx("Phone")}<input value={settings.phone} onChange={(event) => setSettings((current) => ({ ...current, phone: event.target.value }))} /></label></div><label>{tx("Email")}<input type="email" value={settings.email} onChange={(event) => setSettings((current) => ({ ...current, email: event.target.value }))} /></label><div className="settings-two"><label>{tx("Default ready time")}<input type="time" value={settings.default_ready_time} onChange={(event) => setSettings((current) => ({ ...current, default_ready_time: event.target.value }))} /></label><label>{tx("Default close time")}<input type="time" value={settings.default_close_time} onChange={(event) => setSettings((current) => ({ ...current, default_close_time: event.target.value }))} /></label></div><div className="settings-section"><h2>{tx("Customer pricing")}</h2><p>{language === "zh" ? "显示价格为承运商成本加上百分比加价或最低加价中较高的一项。" : "The displayed rate is carrier cost plus the greater of percentage markup or minimum markup."}</p><div className="settings-two"><label>{tx("Markup percent")}<input type="number" min="0" step="0.01" value={settings.markup_percent} onChange={(event) => setSettings((current) => ({ ...current, markup_percent: Number(event.target.value) }))} /></label><label>{tx("Minimum markup (USD)")}<input type="number" min="0" step="0.01" value={settings.minimum_markup} onChange={(event) => setSettings((current) => ({ ...current, minimum_markup: Number(event.target.value) }))} /></label></div></div><div className="settings-section"><h2>{tx("Rate providers")}</h2><div className="provider-toggles"><label><input type="checkbox" checked={settings.wwex_enabled} onChange={(event) => setSettings((current) => ({ ...current, wwex_enabled: event.target.checked }))} /><span><strong>WWEX</strong><small>{language === "zh" ? "包含 WWEX 沙盒报价" : "Include WWEX sandbox rates"}</small></span></label><label><input type="checkbox" checked={settings.priority1_enabled} onChange={(event) => setSettings((current) => ({ ...current, priority1_enabled: event.target.checked }))} /><span><strong>Priority1</strong><small>{language === "zh" ? "包含 Priority1 沙盒报价" : "Include Priority1 sandbox rates"}</small></span></label><label><input type="checkbox" checked={settings.tql_enabled} onChange={(event) => setSettings((current) => ({ ...current, tql_enabled: event.target.checked }))} /><span><strong>TQL</strong><small>{language === "zh" ? "包含 TQL 报价" : "Include TQL rates"}</small></span></label></div></div><button type="submit" disabled={settingsLoading || (!settings.wwex_enabled && !settings.priority1_enabled && !settings.tql_enabled)}>{settingsLoading ? tx("Please wait…") : tx("Save settings")}</button>{!settings.wwex_enabled && !settings.priority1_enabled && !settings.tql_enabled && <small className="settings-warning">{language === "zh" ? "请至少启用一个报价渠道。" : "Keep at least one rate provider enabled."}</small>}</form>}{settingsMessage && <p className="settings-success" role="status">{settingsMessage}</p>}</section>
         </div>
       </main>
       {helpOpen && (
@@ -1400,18 +1342,6 @@ export default function Home() {
             </header>
             <p>{language === "zh" ? `系统将生成 BOL、向承运商预约 Pickup，并从押金扣除 $${Number(pendingBolQuote.price).toFixed(2)}。` : `A BOL will be generated, carrier pickup will be scheduled, and $${Number(pendingBolQuote.price).toFixed(2)} will be deducted from the deposit.`}</p>
             <footer><button type="button" className="secondary-action" onClick={() => setPendingBolQuote(null)}>{language === "zh" ? "取消" : "Cancel"}</button><button type="button" onClick={() => { const quoteId = pendingBolQuote.id; setPendingBolQuote(null); void generateBol(quoteId); }}>{language === "zh" ? "确认生成" : "Confirm and generate"}</button></footer>
-          </section>
-        </div>
-      )}
-      {pendingConfirmation && (
-        <div className="address-book-backdrop" role="presentation" onMouseDown={() => setPendingConfirmation(null)}>
-          <section className="help-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title" onMouseDown={(event) => event.stopPropagation()}>
-            <header>
-              <div><p className="eyebrow">{language === "zh" ? "请确认" : "PLEASE CONFIRM"}</p><h2 id="confirm-dialog-title">{pendingConfirmation.title}</h2></div>
-              <button type="button" onClick={() => setPendingConfirmation(null)} aria-label={language === "zh" ? "关闭确认" : "Close confirmation"}>×</button>
-            </header>
-            <p>{pendingConfirmation.message}</p>
-            <footer><button type="button" className="secondary-action" onClick={() => setPendingConfirmation(null)}>{language === "zh" ? "取消" : "Cancel"}</button><button type="button" onClick={() => { const action = pendingConfirmation.onConfirm; setPendingConfirmation(null); action(); }}>{pendingConfirmation.confirmLabel}</button></footer>
           </section>
         </div>
       )}
