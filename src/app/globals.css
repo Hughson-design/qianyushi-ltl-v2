@@ -481,8 +481,8 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
   .smart-input-row button { min-height: 44px; }
   .form-footer { align-items: stretch; flex-direction: column; gap: 14px; }
   .primary-button { width: 100%; }
-  .rate-card { grid-template-columns: 24px 18px minmax(0, 1fr) auto; }
-  .transit, .rate-badge { display: none; }
+  .rate-card { grid-template-columns: 24px 18px minmax(0, 1fr) minmax(46px, 64px) auto; gap: 8px; padding-inline: 10px; }
+  .rate-badge { display: none; }
   .selection-bar { grid-template-columns: 1fr auto; }
   .selection-bar p { display: none; }
   .booking-columns { grid-template-columns: 1fr; }
