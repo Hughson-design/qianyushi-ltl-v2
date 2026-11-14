@@ -170,7 +170,7 @@ const chineseTranslations: Record<string, string> = {
   "WORKSPACE": "工作台", "ACCOUNT": "账户", "New quote": "新建报价", "Quotes": "报价", "Orders": "订单", "Address book": "地址簿", "Customers": "客户", "Deposit": "押金", "Settings": "设置", "Sign out": "退出登录",
   "CREATE SHIPMENT": "创建运输", "Get an LTL quote": "获取 LTL 报价", "Enter the shipment details once. We’ll compare your available carriers.": "填写一次运输资料，系统将比较可用承运商的价格。", "Available deposit": "可用押金", "View activity →": "查看明细 →",
   "SMART QUOTE": "智能报价", "Paste shipment details to autofill": "粘贴货物资料并自动填写", "Line 1: sender. Line 2: receiver. Line 3 and after: one freight item per line. Commercial, residential, liftgate, and appointment keywords are recognized automatically.": "第一行填写发货地址，第二行填写收货地址，第三行起每行填写一项货物。系统可自动识别商业、住宅、尾门和预约等关键词。", "Autofill": "帮我填写",
-  "Route": "路线", "Where is the freight moving?": "货物从哪里运到哪里？", "SHIP FROM": "发货地", "SHIP TO": "收货地", "READY DATE": "发货日期", "Flexible date": "日期可调整",
+  "Route": "路线", "Where is the freight moving?": "货物从哪里运到哪里？", "SHIP FROM": "发货地", "SHIP TO": "收货地", "READY DATE (PT)": "发货日期（美国太平洋时间）", "Flexible date": "日期可调整",
   "Freight details": "货物详情", "All dimensions use inches and all weights use pounds.": "尺寸统一使用英寸，重量统一使用磅。", "LINE": "货物行", "Remove": "删除", "Packaging": "包装类型", "Select": "请选择", "Carton": "硬纸箱", "Crate": "木箱", "Bale": "捆包", "Roll": "卷", "Pallet": "托盘", "Loose": "未打托", "Stackable": "可堆叠", "Yes": "是", "No": "否", "Pallets": "托数", "Length": "长", "Width": "宽", "Height": "高", "Unit weight": "单托重量", "Total weight": "总重量", "Hazmat": "危险品", "Commodity": "英文品名", "Declared value": "货值", "Add another handling unit": "增加一项货物",
   "Additional services": "附加服务", "Liftgate at pickup": "提货尾门", "Liftgate at delivery": "派送尾门", "Residential pickup": "住宅提货", "Residential delivery": "住宅派送", "Limited access": "受限地点", "Appointment delivery": "预约派送", "Overlength freight": "超长货物", "Your rates are private": "报价仅您可见", "Customers only see the final selling price.": "客户只会看到最终销售价格。", "Get rates": "获取报价", "Comparing carriers…": "正在比较承运商…",
   "QUOTE RESULTS": "报价结果", "Choose a rate": "选择报价", "Estimated transit": "预计运输时间", "Customer price": "客户价格", "Lowest price": "最低价格", "Fastest": "最快", "Deposit after BOL": "生成 BOL 后押金余额", "Continue to booking →": "继续填写下单资料 →",
@@ -263,7 +263,22 @@ export default function Home() {
   const [destination, setDestination] = useState("75247");
   const [originAddress, setOriginAddress] = useState("Ontario, CA · Commercial");
   const [destinationAddress, setDestinationAddress] = useState("Dallas, TX · Commercial");
-  const [readyDate, setReadyDate] = useState("2026-09-14");
+  const [readyDate, setReadyDate] = useState("");
+
+  useEffect(() => {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Los_Angeles",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const parts = formatter.formatToParts(new Date());
+    const today = ["year", "month", "day"]
+      .map((type) => parts.find((part) => part.type === type)?.value)
+      .join("-");
+    setReadyDate((date) => date || today);
+  }, []);
+
   const [pickupReadyTime, setPickupReadyTime] = useState("09:00");
   const [pickupCloseTime, setPickupCloseTime] = useState("16:00");
   const smartQuoteExample = "Commercial, loading dock, 24300 Nandina Ave, Moreno Valley, CA 92551\nResidential, liftgate, appointment, 650 Boulder Drive, Breinigsville, PA 18031\n1 pallet, 110×96×65cm, 177kg, commodity: Furniture\n1 crate, 120×100×180cm, 500kg, non-stackable, commodity: Electronics";
@@ -1115,8 +1130,8 @@ export default function Home() {
                   <div className="location-field"><span className="dot destination-dot" /><div><input value={destination} onChange={(e) => { setDestination(e.target.value); invalidateRates(); }} aria-label="Destination ZIP" /><small>{destinationAddress}</small></div><button type="button" onClick={() => void openAddressBook("route-destination")}>{tx("Address book")}</button></div>
                 </div>
                 <div className="field-block ready-field">
-                  <label>{tx("READY DATE")}</label>
-                  <input className="ready-date-input" type="date" value={readyDate} onChange={(event) => { setReadyDate(event.target.value); invalidateRates(); }} />
+                  <label htmlFor="quote-ready-date">{tx("READY DATE (PT)")}</label>
+                  <input id="quote-ready-date" className="ready-date-input" type="date" value={readyDate} onChange={(event) => { setReadyDate(event.target.value); invalidateRates(); }} />
                   <label className="check ready-check"><input type="checkbox" /> {tx("Flexible date")}</label>
                 </div>
               </div>
@@ -1191,7 +1206,7 @@ export default function Home() {
               </div>
               <form onSubmit={saveBookingDetails}>
                 <div className="booking-toolbar">
-                  <label>{tx("Ship date")}<input type="date" value={readyDate} onChange={(event) => { setReadyDate(event.target.value); invalidateRates(); }} required /></label>
+                  <label>{language === "zh" ? "发货日期（美国太平洋时间）" : "Ship date (PT)"}<input type="date" value={readyDate} onChange={(event) => { setReadyDate(event.target.value); invalidateRates(); }} required /></label>
                   <label>{tx("Ready time")}<input type="time" value={pickupReadyTime} onChange={(event) => setPickupReadyTime(event.target.value)} required /></label>
                   <label>{tx("Close time")}<input type="time" value={pickupCloseTime} min={pickupReadyTime} onChange={(event) => setPickupCloseTime(event.target.value)} required /></label>
                   <label className="booking-toggle"><span>{tx("Skip address verification")}</span><input type="checkbox" checked={bookingDetails.skipAddressVerification} onChange={(event) => setBookingDetails((current) => ({ ...current, skipAddressVerification: event.target.checked }))} /></label>
