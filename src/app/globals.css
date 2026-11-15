@@ -94,8 +94,8 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .section-title > span { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 50%; color: white; background: var(--green); font-size: 12px; font-weight: 800; }
 .section-title h2 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 21px; }
 .section-title p { margin: 3px 0 0; color: var(--muted); font-size: 11px; }
-.panel:has(> .route-grid-single-row) { margin-top: 10px; padding: 14px 17px; }
-.panel:has(> .route-grid-single-row) .section-title { margin-bottom: 10px; }
+.panel:has(> .route-grid-single-row) { margin-top: 10px; padding: 11px 17px; }
+.panel:has(> .route-grid-single-row) .section-title { margin-bottom: 7px; }
 .route-grid { display: grid; grid-template-columns: 1fr 44px 1fr; align-items: end; }
 .route-grid-single-row { grid-template-columns: minmax(270px, 1fr) 32px minmax(270px, 1fr) 180px; align-items: start; gap: 8px; overflow-x: auto; padding-bottom: 3px; }
 .field-block > label, .input-group > label, .dimensions > label { display: block; margin-bottom: 7px; color: #75817c; font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
@@ -113,7 +113,6 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .route-grid-single-row .field-block > label:first-child { height: 11px; line-height: 11px; }
 .route-grid-single-row .route-line { align-self: start; height: 49px; margin-top: 18px; padding: 0; display: grid; place-items: center; }
 .ready-date-input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(23,107,74,.08); }
-.ready-check { display: block; margin-top: 5px; padding: 0; font-size: 9px; }
 .date-row { margin-top: 18px; display: flex; align-items: flex-end; gap: 24px; }
 .input-group input, .input-group select, .dimensions input { height: 41px; width: 100%; padding: 0 11px; outline: none; border: 1px solid #ccd6d1; border-radius: 7px; color: var(--ink); background: white; font-size: 12px; }
 .input-group input:focus, .input-group select:focus, .dimensions input:focus, .location-field:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px rgba(23,107,74,.08); }
