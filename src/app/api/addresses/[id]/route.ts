@@ -15,7 +15,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (auth.response || !auth.session) return auth.response;
     const body = await request.json();
     const { category } = body;
-    if (category !== undefined && category !== "sender" && category !== "receiver") {
+    if (category !== undefined && category !== "sender" && category !== "receiver" && category !== "both") {
       return NextResponse.json({ error: "Invalid address category." }, { status: 400 });
     }
     const address = Object.fromEntries(addressFields.map((field) => [field, String(body[field] || "").trim()]));
