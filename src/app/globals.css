@@ -262,6 +262,11 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .address-book-delete:disabled { opacity: .55; }
 .address-card-actions { padding-right: 10px; display: flex; gap: 5px; }
 .address-card-actions .address-book-delete { margin: 0; }
+.address-directory .address-book-list { gap: 5px; }
+.address-directory .address-book-select { min-width: 0; padding: 7px 10px; overflow-wrap: anywhere; }
+.saved-address-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; }
+.address-directory .saved-address-heading strong { margin: 0; }
+.address-directory .address-book-card small { margin-top: 2px; }
 .address-book-edit { padding: 6px 8px; border: 0; border-radius: 6px; color: var(--green); background: var(--green-soft); font-size: 8px; font-weight: 800; }
 .address-form-actions { display: flex; gap: 7px; }
 .address-form-actions > button { flex: 1; height: 41px; border: 0; border-radius: 7px; color: white; background: var(--green); font-size: 10px; font-weight: 800; }
