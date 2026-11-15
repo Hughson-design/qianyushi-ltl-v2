@@ -275,8 +275,8 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .address-create-form, .settings-form { margin-top: 16px; display: grid; gap: 11px; }
 .address-create-form label, .settings-form label { color: #75817c; font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
 .address-create-form label small { float: right; color: #9aa49f; font-size: 7px; text-transform: none; }
-.address-create-form input, .settings-form input { width: 100%; height: 40px; margin-top: 6px; padding: 0 10px; border: 1px solid #ccd6d1; border-radius: 7px; outline: none; color: var(--ink); background: white; font-size: 11px; font-weight: 500; text-transform: none; }
-.address-create-form input:focus, .settings-form input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(23,107,74,.08); }
+.address-create-form input, .address-create-form select, .settings-form input { width: 100%; height: 40px; margin-top: 6px; padding: 0 10px; border: 1px solid #ccd6d1; border-radius: 7px; outline: none; color: var(--ink); background: white; font-size: 11px; font-weight: 500; text-transform: none; }
+.address-create-form input:focus, .address-create-form select:focus, .settings-form input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(23,107,74,.08); }
 .address-location-row, .settings-two { display: grid; grid-template-columns: .8fr .55fr 1.2fr; gap: 8px; }
 .address-location-row .span-two { grid-column: span 2; }
 .address-create-form > button, .settings-form > button { height: 41px; margin-top: 3px; border: 0; border-radius: 7px; color: white; background: var(--green); font-size: 10px; font-weight: 800; }
