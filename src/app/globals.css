@@ -109,6 +109,9 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .ready-field { min-width: 175px; }
 .ready-date-input { width: 100%; height: 63px; padding: 0 12px; outline: none; border: 1px solid #ccd6d1; border-radius: 9px; color: var(--ink); background: white; font-size: 11px; }
 .route-grid-single-row .location-field { min-height: 49px; padding: 6px 8px; }
+.route-grid-single-row .location-field > div { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.route-grid-single-row .location-field input { width: 6ch; flex: 0 0 6ch; }
+.route-grid-single-row .location-field small { min-width: 0; margin-top: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .route-grid-single-row .ready-date-input { height: 49px; }
 .route-grid-single-row .field-block > label:first-child { height: 11px; line-height: 11px; }
 .route-grid-single-row .route-line { align-self: start; height: 49px; margin-top: 18px; padding: 0; display: grid; place-items: center; }
