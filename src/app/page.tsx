@@ -20,6 +20,7 @@ type FreightItem = {
 };
 
 type Rate = {
+  quoteToken: string;
   carrier: string;
   service: string;
   transit: string;
@@ -1011,7 +1012,8 @@ export default function Home() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to get rates.");
 
-      const normalized: Rate[] = data.rates.map((rate: { provider: "wwex" | "priority1" | "tql"; carrier: string; service: string; transitDays: number | null; price: number; providerRef: Record<string, string | number> }) => ({
+      const normalized: Rate[] = data.rates.map((rate: { provider: "wwex" | "priority1" | "tql"; carrier: string; service: string; transitDays: number | null; price: number; providerRef: Record<string, string | number>; quoteToken: string }) => ({
+        quoteToken: rate.quoteToken,
         carrier: rate.carrier,
         service: `${rate.provider === "wwex" ? "WWEX" : rate.provider === "tql" ? "TQL" : "Priority1"} · ${rate.service}`,
         transit: rate.transitDays ? `${rate.transitDays} ${rate.transitDays === 1 ? "day" : "days"}` : "Not provided",
