@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readQuoteToken, shipmentProof } from "@/lib/quote-integrity";
 
 import { supabaseRequest } from "@/lib/supabase-server";
 import { customerFilter, requireAppSession } from "@/lib/auth-server";
@@ -30,30 +31,37 @@ export async function POST(request: Request) {
     const auth = await requireAppSession();
     if (auth.response || !auth.session) return auth.response;
     const body = await request.json();
-    if (!body?.rate?.carrier || !Number.isFinite(Number(body?.rate?.price))) {
-      return NextResponse.json({ error: "Select a valid rate before saving." }, { status: 400 });
+    const customerId = auth.session.customerId;
+    if (!customerId) return NextResponse.json({ error: "An active customer account is required." }, { status: 403 });
+    const offer = readQuoteToken(body?.rate?.quoteToken, customerId);
+    if (!offer) return NextResponse.json({ error: "Get fresh rates before saving this quote." }, { status: 400 });
+    const { rate, shipment } = offer;
+    if (body.sender?.zip !== shipment.originZip || body.receiver?.zip !== shipment.destinationZip || body.readyDate !== shipment.readyDate) {
+      return NextResponse.json({ error: "The route or ready date changed. Get fresh rates before saving." }, { status: 400 });
     }
     if (!body?.sender?.zip || !body?.receiver?.zip || !body?.reference) {
       return NextResponse.json({ error: "Complete the required booking details." }, { status: 400 });
     }
 
     const datePart = new Date().toISOString().slice(0, 10).replaceAll("-", "");
-    const quoteNumber = `Q-${datePart}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
+    const id = crypto.randomUUID();
+    const quoteNumber = `Q-${datePart}-${id.slice(0, 6).toUpperCase()}`;
     const record = {
+      id,
       quote_number: quoteNumber,
       status: "draft",
       reference: String(body.reference),
-      origin_zip: String(body.originZip || body.sender.zip),
-      destination_zip: String(body.destinationZip || body.receiver.zip),
-      ready_date: body.readyDate || null,
-      carrier: String(body.rate.carrier),
-      service: String(body.rate.service || ""),
-      transit: String(body.rate.transit || ""),
-      price: Number(body.rate.price),
-      provider: body.rate.provider || null,
-      provider_ref: body.rate.providerRef || {},
-      freight_items: Array.isArray(body.items) ? body.items : [],
-      services: Array.isArray(body.services) ? body.services : [],
+      origin_zip: shipment.originZip,
+      destination_zip: shipment.destinationZip,
+      ready_date: shipment.readyDate,
+      carrier: rate.carrier,
+      service: rate.service,
+      transit: rate.transitDays === null ? "Not provided" : `${rate.transitDays} ${rate.transitDays === 1 ? "day" : "days"}`,
+      price: rate.price,
+      provider: rate.provider,
+      provider_ref: { ...rate.providerRef, shipmentProof: shipmentProof(id, customerId) },
+      freight_items: shipment.items,
+      services: shipment.services,
       sender: body.sender,
       receiver: body.receiver,
       skip_address_verification: Boolean(body.skipAddressVerification),
