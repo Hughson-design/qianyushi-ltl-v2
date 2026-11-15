@@ -35,7 +35,7 @@ export type StoredQuote = {
   ready_date: string;
   pickup_ready_time: string;
   pickup_close_time: string;
-  provider: "priority1" | "wwex";
+  provider: "priority1" | "wwex" | "tql";
   provider_ref: Record<string, string | number>;
   transit: string;
   sender: ShipmentParty;
