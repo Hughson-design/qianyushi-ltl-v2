@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { issueQuoteToken } from "@/lib/quote-integrity";
 
+import { getMothershipRates } from "@/lib/carriers/mothership";
 import { getPriority1Rates } from "@/lib/carriers/priority1";
 import type { NormalizedRate, QuoteLineItem, QuoteLocation, QuoteRequest } from "@/lib/carriers/types";
 import { getWwexRates } from "@/lib/carriers/wwex";
@@ -119,17 +120,21 @@ export async function POST(request: Request) {
     };
 
     const pricing = await pricingSettings(auth.session);
-    const [wwex, priority1] = await Promise.allSettled([
+    const [wwex, priority1, mothership] = await Promise.allSettled([
       pricing.wwexEnabled ? getWwexRates(quoteRequest) : Promise.resolve([]),
       pricing.priority1Enabled ? getPriority1Rates(quoteRequest) : Promise.resolve([]),
+      getMothershipRates(quoteRequest),
     ]);
     const providerErrors: Record<string, string> = {};
     if (wwex.status === "rejected") providerErrors.wwex = wwex.reason instanceof Error ? wwex.reason.message : "WWEX quote failed.";
     if (priority1.status === "rejected") providerErrors.priority1 = priority1.reason instanceof Error ? priority1.reason.message : "Priority1 quote failed.";
 
+    if (mothership.status === "rejected") providerErrors.mothership = "Mothership sandbox quote failed.";
+
     const rates = [
       ...cheapestFive(wwex.status === "fulfilled" ? wwex.value : []),
       ...cheapestFive(priority1.status === "fulfilled" ? priority1.value : []),
+      ...cheapestFive(mothership.status === "fulfilled" ? mothership.value : []),
     ].filter((rate) => Number.isFinite(rate.price) && rate.price > 0).map((rate) => customerRate(rate, pricing.markupPercent, pricing.minimumMarkup)).sort((a, b) => a.price - b.price);
 
     if (rates.length === 0) {
