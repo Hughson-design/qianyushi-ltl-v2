@@ -16,6 +16,7 @@ const defaults = {
   minimum_markup: 0,
   wwex_enabled: true,
   priority1_enabled: true,
+  tql_enabled: false,
 };
 
 async function settingsStorageError(response: Response, fallback: string) {
@@ -57,16 +58,26 @@ export async function POST(request: Request) {
       minimum_markup: Math.max(0, Number(body.minimum_markup) || 0),
       wwex_enabled: body.wwex_enabled !== false,
       priority1_enabled: body.priority1_enabled !== false,
+      tql_enabled: body.tql_enabled === true,
       updated_at: new Date().toISOString(),
     };
     if (!record.company_name) return NextResponse.json({ error: "Company name is required." }, { status: 400 });
     if (record.default_close_time <= record.default_ready_time) return NextResponse.json({ error: "Default close time must be later than ready time." }, { status: 400 });
-    if (!record.wwex_enabled && !record.priority1_enabled) return NextResponse.json({ error: "Keep at least one rate provider enabled." }, { status: 400 });
-    const response = await supabaseRequest("platform_settings?on_conflict=id", {
+    if (!record.wwex_enabled && !record.priority1_enabled && !record.tql_enabled) return NextResponse.json({ error: "Keep at least one rate provider enabled." }, { status: 400 });
+    const save = (settings: object) => supabaseRequest("platform_settings?on_conflict=id", {
       method: "POST",
       headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-      body: JSON.stringify(record),
+      body: JSON.stringify(settings),
     });
+    let response = await save(record);
+    if (!response.ok) {
+      const error = await response.clone().json().catch(() => null);
+      if (error?.code === "PGRST204" && String(error.message).includes("tql_enabled")) {
+        if (record.tql_enabled) return NextResponse.json({ error: "Run the TQL settings migration before enabling TQL." }, { status: 503 });
+        const { tql_enabled: _tql, ...legacyRecord } = record;
+        response = await save(legacyRecord);
+      }
+    }
     if (!response.ok) return settingsStorageError(response, "Unable to save settings.");
     const rows = await response.json();
     return NextResponse.json({ settings: rows[0] });
