@@ -286,7 +286,7 @@ export default function Home() {
 
   const [pickupReadyTime, setPickupReadyTime] = useState("09:00");
   const [pickupCloseTime, setPickupCloseTime] = useState("16:00");
-  const smartQuoteExample = "Commercial, loading dock, 24300 Nandina Ave, Moreno Valley, CA 92551\nResidential, liftgate, appointment, 650 Boulder Drive, Breinigsville, PA 18031\n1 pallet, 110×96×65cm, 177kg, commodity: Furniture\n1 crate, 120×100×180cm, 500kg, non-stackable, commodity: Electronics";
+  const smartQuoteExample = "Commercial, loading dock, 13602 12th St Unit B, Chino, CA 91710\nResidential, liftgate, appointment, 650 Boulder Drive, Breinigsville, PA 18031\n1 pallet, 110×96×65cm, 177kg, commodity: Furniture\n1 crate, 120×100×180cm, 500kg, non-stackable, commodity: Electronics";
   const [smartText, setSmartText] = useState(smartQuoteExample);
   const [smartResult, setSmartResult] = useState<SmartQuoteResult | null>(null);
   const [deposit, setDeposit] = useState(0);
