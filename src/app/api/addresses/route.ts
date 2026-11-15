@@ -40,6 +40,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Company, street address, postal code, state, and city are required." }, { status: 400 });
     }
 
+    const { category } = body;
+    if (category !== undefined && category !== "sender" && category !== "receiver") {
+      return NextResponse.json({ error: "Invalid address category." }, { status: 400 });
+    }
     const record = Object.fromEntries(addressFields.map((field) => [field, clean(body[field])]));
     const fingerprint = [record.company, record.address1, record.address2, record.zip]
       .map((value) => value.toLowerCase().replace(/\s+/g, " "))
@@ -50,7 +54,7 @@ export async function POST(request: Request) {
     const response = await supabaseRequest(`address_book?on_conflict=${conflict}`, {
       method: "POST",
       headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-      body: JSON.stringify({ ...ownedRecord, fingerprint, updated_at: new Date().toISOString() }),
+      body: JSON.stringify({ ...ownedRecord, ...(category === undefined ? {} : { category }), fingerprint, updated_at: new Date().toISOString() }),
     });
     if (!response.ok) return addressStorageError(response.status, await responseError(response, "Unable to save this address."));
     const rows = await response.json();
