@@ -66,8 +66,29 @@ export async function supabaseAuth(path: string, init?: RequestInit, accessToken
   });
 }
 
+function tokenSession(accessToken: string) {
+  try {
+    const claims = JSON.parse(Buffer.from(accessToken.split(".")[1], "base64url").toString("utf8"));
+    if (!/^[0-9a-f-]{36}$/i.test(claims.sub) || !/^[0-9a-f-]{36}$/i.test(claims.session_id)) return null;
+    return { userId: String(claims.sub), sessionId: String(claims.session_id) };
+  } catch {
+    return null;
+  }
+}
+
+// Called only with tokens returned by Supabase Auth on a successful sign-in.
 export async function setAuthCookies(accessToken: string, refreshToken: string, expiresIn = 3600) {
+  const session = tokenSession(accessToken);
+  if (!session) throw new Error("Unable to identify the new session.");
+  const response = await supabaseRequest(`app_users?user_id=eq.${encodeURIComponent(session.userId)}&active=eq.true`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ active_session_id: session.sessionId }),
+  });
+  if (!response.ok) throw new Error("Unable to activate the new session.");
+  if (!(await response.json()).length) throw new Error("This login account is inactive.");
   const store = await cookies();
+  store.delete(ACTIVE_CUSTOMER_COOKIE);
   const secure = process.env.NODE_ENV === "production";
   store.set(ACCESS_COOKIE, accessToken, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: Math.max(60, expiresIn) });
   store.set(REFRESH_COOKIE, refreshToken, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
@@ -81,7 +102,7 @@ export async function clearAuthCookies() {
 }
 
 async function profileForUser(userId: string) {
-  const response = await supabaseRequest(`app_users?select=user_id,customer_id,email,full_name,role,active,customers(name,active,can_self_book)&user_id=eq.${encodeURIComponent(userId)}&limit=1`);
+  const response = await supabaseRequest(`app_users?select=user_id,customer_id,email,full_name,role,active,active_session_id,customers(name,active,can_self_book)&user_id=eq.${encodeURIComponent(userId)}&limit=1`);
   if (!response.ok) return null;
   const rows = await response.json();
   return rows[0] || null;
@@ -102,6 +123,8 @@ export async function getAppSession(): Promise<AppSession | null> {
   const authUser = await userResponse.json();
   const profile = await profileForUser(String(authUser.id || ""));
   const homeCustomer = Array.isArray(profile?.customers) ? profile.customers[0] : profile?.customers;
+  const token = tokenSession(accessToken);
+  if (!token || token.userId !== authUser.id || profile?.active_session_id !== token.sessionId) return null;
   if (!profile?.active || !profile.customer_id || homeCustomer?.active !== true) return null;
   let activeCustomer = homeCustomer;
   let customerId = profile.customer_id || null;
