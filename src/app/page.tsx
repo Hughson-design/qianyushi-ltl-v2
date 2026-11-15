@@ -196,7 +196,7 @@ function Icon({ children }: { children: React.ReactNode }) {
 export default function Home() {
   const [language, setLanguage] = useState<"en" | "zh">("en");
   const [helpOpen, setHelpOpen] = useState(false);
-  const [authState, setAuthState] = useState<"checking" | "setup" | "login" | "ready">("checking");
+  const [authState, setAuthState] = useState<"checking" | "setup" | "login" | "ready" | "signed-out">("checking");
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authForm, setAuthForm] = useState({ name: "Cathy Huang", email: "", password: "" });
   const [authError, setAuthError] = useState("");
@@ -338,9 +338,8 @@ export default function Home() {
         const session = await response.json();
         if (!disposed && !session.authenticated) {
           setAuthUser(null);
-          setAuthState("login");
+          setAuthState("signed-out");
           setAuthForm((form) => ({ ...form, password: "" }));
-          setAuthError(language === "zh" ? "会话已结束，请重新登录。" : "Your session ended. Please sign in again.");
         }
       } catch {
         // A temporary network failure can be checked on the next poll.
@@ -357,7 +356,7 @@ export default function Home() {
       window.removeEventListener("focus", verifySession);
       document.removeEventListener("visibilitychange", verifySession);
     };
-  }, [authState, language]);
+  }, [authState]);
 
   async function checkSession() {
     try {
@@ -1096,8 +1095,13 @@ export default function Home() {
         <section className="auth-card">
           <Image className="auth-logo" src="/qianvushi-logo.jpg" alt="Shenzhen Qianyushi Supply Chain Service Co., Ltd. logo" width={64} height={64} priority />
           <p className="eyebrow">QIANYUSHI LTL</p>
-          <h1>{tx(authState === "checking" ? "Opening your workspace…" : authState === "setup" ? "Create administrator" : "Sign in")}</h1>
-          {authState === "checking" ? <p className="auth-subtitle">{tx("Checking the secure workspace.")}</p> : <form onSubmit={submitAuthentication} className="auth-form">{authState === "setup" && <label>{tx("Administrator name")}<input required value={authForm.name} onChange={(event) => setAuthForm((current) => ({ ...current, name: event.target.value }))} autoComplete="name" /></label>}<label>{tx("Email")}<input required type="email" value={authForm.email} onChange={(event) => setAuthForm((current) => ({ ...current, email: event.target.value }))} autoComplete="email" /></label><label>{tx("Password")}<input required minLength={8} type="password" value={authForm.password} onChange={(event) => setAuthForm((current) => ({ ...current, password: event.target.value }))} autoComplete={authState === "setup" ? "new-password" : "current-password"} /></label>{authError && <p className="auth-error" role="alert">{authError}</p>}<button type="submit" disabled={authLoading}>{tx(authLoading ? "Please wait…" : authState === "setup" ? "Create administrator" : "Sign in")}</button>{authState === "setup" && <small>{language === "zh" ? "这是第一个账户，将拥有完整管理员权限。" : "This is the first account and will have full administrator access."}</small>}</form>}
+          <h1>{authState === "signed-out" ? (language === "zh" ? "您已退出登录" : "You’ve been signed out") : tx(authState === "checking" ? "Opening your workspace…" : authState === "setup" ? "Create administrator" : "Sign in")}</h1>
+          {authState === "signed-out" ? (
+            <div className="auth-form">
+              <p className="auth-subtitle" role="status">{language === "zh" ? "您的会话已结束。账号在其他设备登录或会话过期时，系统会退出当前页面。" : "Your session ended. This can happen when you sign in on another device or your session expires."}</p>
+              <button type="button" onClick={() => window.location.reload()}>{language === "zh" ? "重新登录" : "Sign in again"}</button>
+            </div>
+          ) : authState === "checking" ? <p className="auth-subtitle">{tx("Checking the secure workspace.")}</p> : <form onSubmit={submitAuthentication} className="auth-form">{authState === "setup" && <label>{tx("Administrator name")}<input required value={authForm.name} onChange={(event) => setAuthForm((current) => ({ ...current, name: event.target.value }))} autoComplete="name" /></label>}<label>{tx("Email")}<input required type="email" value={authForm.email} onChange={(event) => setAuthForm((current) => ({ ...current, email: event.target.value }))} autoComplete="email" /></label><label>{tx("Password")}<input required minLength={8} type="password" value={authForm.password} onChange={(event) => setAuthForm((current) => ({ ...current, password: event.target.value }))} autoComplete={authState === "setup" ? "new-password" : "current-password"} /></label>{authError && <p className="auth-error" role="alert">{authError}</p>}<button type="submit" disabled={authLoading}>{tx(authLoading ? "Please wait…" : authState === "setup" ? "Create administrator" : "Sign in")}</button>{authState === "setup" && <small>{language === "zh" ? "这是第一个账户，将拥有完整管理员权限。" : "This is the first account and will have full administrator access."}</small>}</form>}
         </section>
       </main>
     );
