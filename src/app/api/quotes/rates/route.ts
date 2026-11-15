@@ -3,6 +3,7 @@ import { issueQuoteToken } from "@/lib/quote-integrity";
 
 import { getMothershipRates } from "@/lib/carriers/mothership";
 import { getPriority1Rates } from "@/lib/carriers/priority1";
+import { getTqlRates } from "@/lib/carriers/tql";
 import type { NormalizedRate, QuoteLineItem, QuoteLocation, QuoteRequest } from "@/lib/carriers/types";
 import { getWwexRates } from "@/lib/carriers/wwex";
 import { supabaseRequest } from "@/lib/supabase-server";
@@ -63,9 +64,9 @@ function cheapestFive(rates: NormalizedRate[]) {
 }
 
 async function pricingSettings(session: AppSession) {
-  const fallback = { markupPercent: 0, minimumMarkup: 0, wwexEnabled: true, priority1Enabled: true };
+  const fallback = { markupPercent: 0, minimumMarkup: 0, wwexEnabled: true, priority1Enabled: true, tqlEnabled: false };
   try {
-    const response = await supabaseRequest("platform_settings?select=markup_percent,minimum_markup,wwex_enabled,priority1_enabled&id=eq.true&limit=1");
+    const response = await supabaseRequest("platform_settings?select=*&id=eq.true&limit=1");
     if (!response.ok) return fallback;
     const settings = (await response.json())[0];
     if (!settings) return fallback;
@@ -79,6 +80,7 @@ async function pricingSettings(session: AppSession) {
       minimumMarkup: Math.max(0, Number(customerPricing.minimum_markup) || 0),
       wwexEnabled: settings.wwex_enabled !== false,
       priority1Enabled: settings.priority1_enabled !== false,
+      tqlEnabled: settings.tql_enabled === true,
     };
   } catch {
     return fallback;
@@ -120,20 +122,23 @@ export async function POST(request: Request) {
     };
 
     const pricing = await pricingSettings(auth.session);
-    const [wwex, priority1, mothership] = await Promise.allSettled([
+    const [wwex, priority1, tql, mothership] = await Promise.allSettled([
       pricing.wwexEnabled ? getWwexRates(quoteRequest) : Promise.resolve([]),
       pricing.priority1Enabled ? getPriority1Rates(quoteRequest) : Promise.resolve([]),
+      pricing.tqlEnabled ? getTqlRates(quoteRequest) : Promise.resolve([]),
       getMothershipRates(quoteRequest),
     ]);
     const providerErrors: Record<string, string> = {};
     if (wwex.status === "rejected") providerErrors.wwex = wwex.reason instanceof Error ? wwex.reason.message : "WWEX quote failed.";
     if (priority1.status === "rejected") providerErrors.priority1 = priority1.reason instanceof Error ? priority1.reason.message : "Priority1 quote failed.";
+    if (tql.status === "rejected") providerErrors.tql = tql.reason instanceof Error ? tql.reason.message : "TQL quote failed.";
 
     if (mothership.status === "rejected") providerErrors.mothership = "Mothership sandbox quote failed.";
 
     const rates = [
       ...cheapestFive(wwex.status === "fulfilled" ? wwex.value : []),
       ...cheapestFive(priority1.status === "fulfilled" ? priority1.value : []),
+      ...cheapestFive(tql.status === "fulfilled" ? tql.value : []),
       ...cheapestFive(mothership.status === "fulfilled" ? mothership.value : []),
     ].filter((rate) => Number.isFinite(rate.price) && rate.price > 0).map((rate) => customerRate(rate, pricing.markupPercent, pricing.minimumMarkup)).sort((a, b) => a.price - b.price);
 
