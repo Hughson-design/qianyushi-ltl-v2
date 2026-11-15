@@ -68,7 +68,10 @@ type BookingParty = {
   save: string;
 };
 
+type AddressCategory = "sender" | "receiver";
+
 type AddressBookEntry = Omit<BookingParty, "save"> & {
+  category?: AddressCategory | null;
   id: string;
   created_at: string;
   updated_at: string;
@@ -171,7 +174,7 @@ const chineseTranslations: Record<string, string> = {
   "WORKSPACE": "工作台", "ACCOUNT": "账户", "New quote": "新建报价", "Quotes": "报价", "Orders": "订单", "Address book": "地址簿", "Customers": "客户", "Deposit": "押金", "Settings": "设置", "Sign out": "退出登录",
   "CREATE SHIPMENT": "创建运输", "Get an LTL quote": "获取 LTL 报价", "Enter the shipment details once. We’ll compare your available carriers.": "填写一次运输资料，系统将比较可用承运商的价格。", "Available deposit": "可用押金", "View activity →": "查看明细 →",
   "SMART QUOTE": "智能报价", "Paste shipment details to autofill": "粘贴货物资料并自动填写", "Line 1: sender. Line 2: receiver. Line 3 and after: one freight item per line. Commercial, residential, liftgate, and appointment keywords are recognized automatically.": "第一行填写发货地址，第二行填写收货地址，第三行起每行填写一项货物。系统可自动识别商业、住宅、尾门和预约等关键词。", "Autofill": "帮我填写",
-  "Route": "路线", "Where is the freight moving?": "货物从哪里运到哪里？", "SHIP FROM": "发货地", "SHIP TO": "收货地", "READY DATE (PT)": "发货日期（美国太平洋时间）", "Flexible date": "日期可调整",
+  "Route": "路线", "Where is the freight moving?": "货物从哪里运到哪里？", "SHIP FROM": "发货地", "SHIP TO": "收货地", "Address category": "地址分类", "Choose a category": "请选择分类", "Uncategorized": "未分类", "READY DATE (PT)": "发货日期（美国太平洋时间）", "Flexible date": "日期可调整",
   "Freight details": "货物详情", "All dimensions use inches and all weights use pounds.": "尺寸统一使用英寸，重量统一使用磅。", "LINE": "货物行", "Remove": "删除", "Packaging": "包装类型", "Select": "请选择", "Carton": "硬纸箱", "Crate": "木箱", "Bale": "捆包", "Roll": "卷", "Pallet": "托盘", "Loose": "未打托", "Stackable": "可堆叠", "Yes": "是", "No": "否", "Pallets": "托数", "Length": "长", "Width": "宽", "Height": "高", "Unit weight": "单托重量", "Total weight": "总重量", "Hazmat": "危险品", "Commodity": "英文品名", "Declared value": "货值", "Add another handling unit": "增加一项货物",
   "Additional services": "附加服务", "Liftgate at pickup": "提货尾门", "Liftgate at delivery": "派送尾门", "Residential pickup": "住宅提货", "Residential delivery": "住宅派送", "Limited access": "受限地点", "Appointment delivery": "预约派送", "Overlength freight": "超长货物", "Your rates are private": "报价仅您可见", "Customers only see the final selling price.": "客户只会看到最终销售价格。", "Get rates": "获取报价", "Comparing carriers…": "正在比较承运商…",
   "QUOTE RESULTS": "报价结果", "Choose a rate": "选择报价", "Transit days": "预计运输天数", "Not provided": "未提供", "Customer price": "客户价格", "Lowest price": "最低价格", "Fastest": "最快", "Deposit after BOL": "生成 BOL 后押金余额", "Continue to booking →": "继续填写下单资料 →",
@@ -222,6 +225,7 @@ export default function Home() {
   const [addressPageMessage, setAddressPageMessage] = useState("");
   const [savingAddress, setSavingAddress] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [addressCategory, setAddressCategory] = useState<AddressCategory | "">("");
   const [newAddress, setNewAddress] = useState<BookingParty>({ ...blankBookingParty });
   const [depositTransactions, setDepositTransactions] = useState<DepositTransaction[]>([]);
   const [depositLoading, setDepositLoading] = useState(false);
@@ -287,6 +291,8 @@ export default function Home() {
   const [smartResult, setSmartResult] = useState<SmartQuoteResult | null>(null);
   const [deposit, setDeposit] = useState(0);
 
+  const pickerCategory = addressBookTarget === "sender" || addressBookTarget === "route-origin" ? "sender" : "receiver";
+  const pickerAddresses = addressBookEntries.filter((entry) => !entry.category || entry.category === pickerCategory);
   const tx = (english: string) => language === "zh" ? chineseTranslations[english] || english : english;
   const statusLabel = (status: string) => language === "zh" ? ({ draft: "草稿", booking: "下单中", booked: "已生成 BOL", void: "已取消" }[status] || status) : status;
   const helpItems = language === "zh" ? [
@@ -553,11 +559,12 @@ export default function Home() {
     setAddressBookError("");
     setAddressPageMessage("");
     try {
-      const response = await fetch(editingAddressId ? `/api/addresses/${editingAddressId}` : "/api/addresses", { method: editingAddressId ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newAddress) });
+      const response = await fetch(editingAddressId ? `/api/addresses/${editingAddressId}` : "/api/addresses", { method: editingAddressId ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...newAddress, category: addressCategory }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to save this address.");
       setAddressBookEntries((current) => editingAddressId ? current.map((entry) => entry.id === data.address.id ? data.address : entry) : [data.address, ...current.filter((entry) => entry.id !== data.address.id)]);
       setNewAddress({ ...blankBookingParty });
+      setAddressCategory("");
       setEditingAddressId(null);
       setAddressPageMessage(editingAddressId ? "Address updated." : "Address saved.");
     } catch (error) {
@@ -571,6 +578,7 @@ export default function Home() {
     const { id, created_at: _createdAt, updated_at: _updatedAt, ...address } = entry;
     setEditingAddressId(id);
     setNewAddress({ ...address, save: "no" });
+    setAddressCategory(entry.category ?? "");
     setAddressPageMessage("");
     setAddressBookError("");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -579,6 +587,7 @@ export default function Home() {
   function cancelAddressEdit() {
     setEditingAddressId(null);
     setNewAddress({ ...blankBookingParty });
+    setAddressCategory("");
   }
 
   async function saveAddressesToBook() {
@@ -588,7 +597,7 @@ export default function Home() {
       const response = await fetch("/api/addresses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bookingDetails[party]),
+        body: JSON.stringify({ ...bookingDetails[party], category: party }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || `Unable to save the ${party} address.`);
@@ -1296,8 +1305,8 @@ export default function Home() {
         <div className="content workspace-page" hidden={view !== "addresses"}>
           <section className="page-heading"><div><p className="eyebrow">{tx("SAVED LOCATIONS")}</p><h1>{tx("Address book")}</h1><p>{tx("Manage frequently used sender and receiver addresses.")}</p></div></section>
           <div className="address-page-grid">
-            <section className="panel address-create-panel"><h2>{tx(editingAddressId ? "Edit address" : "Add address")}</h2><form onSubmit={addAddress} className="address-create-form"><label>{tx("Company or name")}<input required value={newAddress.company} onChange={(event) => void updateNewAddress("company", event.target.value)} /></label><label>{tx("Address 1")}<input required value={newAddress.address1} onChange={(event) => void updateNewAddress("address1", event.target.value)} /></label><label>{tx("Address 2")} <small>{tx("Optional")}</small><input value={newAddress.address2} onChange={(event) => void updateNewAddress("address2", event.target.value)} /></label><div className="address-location-row"><label>{tx("Postal code")}<input required maxLength={5} inputMode="numeric" value={newAddress.zip} onChange={(event) => void updateNewAddress("zip", event.target.value.replace(/\D/g, "").slice(0, 5))} /></label><label>{tx("State")}<input required maxLength={2} value={newAddress.state} onChange={(event) => void updateNewAddress("state", event.target.value.toUpperCase())} /></label><label>{tx("City")}<input required value={newAddress.city} onChange={(event) => void updateNewAddress("city", event.target.value)} /></label></div><div className="address-location-row"><label>{tx("Contact")}<input value={newAddress.contact} onChange={(event) => void updateNewAddress("contact", event.target.value)} /></label><label className="span-two">{tx("Phone")}<input value={newAddress.phone} onChange={(event) => void updateNewAddress("phone", event.target.value)} /></label></div><label>{tx("Email")} <small>{tx("Optional")}</small><input type="email" value={newAddress.email} onChange={(event) => void updateNewAddress("email", event.target.value)} /></label><div className="address-form-actions"><button type="submit" disabled={savingAddress}>{savingAddress ? tx("Please wait…") : tx(editingAddressId ? "Update address" : "Save address")}</button>{editingAddressId && <button type="button" className="secondary-action" onClick={cancelAddressEdit}>{tx("Cancel")}</button>}</div></form>{addressPageMessage && <p className="settings-success">{addressPageMessage}</p>}{addressBookError && <p className="address-book-error">{addressBookError}</p>}</section>
-            <section className="panel address-directory"><div className="directory-heading"><h2>{tx("Saved addresses")}</h2><span>{addressBookEntries.length}</span></div>{addressBookLoading ? <p className="address-book-empty">{tx("Loading addresses…")}</p> : addressBookEntries.length === 0 ? <p className="address-book-empty">{tx("No saved addresses yet.")}</p> : <div className="address-book-list">{addressBookEntries.map((entry) => <div className="address-book-card" key={entry.id}><div className="address-book-select"><strong>{entry.company}</strong><span>{entry.address1}{entry.address2 ? `, ${entry.address2}` : ""}</span><span>{entry.city}, {entry.state} {entry.zip}</span><small>{entry.contact}{entry.phone ? ` · ${entry.phone}` : ""}</small></div><div className="address-card-actions"><button type="button" className="address-book-edit" onClick={() => editAddress(entry)}>{tx("Edit")}</button><button type="button" className="address-book-delete" onClick={() => void deleteAddress(entry)} disabled={deletingAddressId === entry.id}>{deletingAddressId === entry.id ? (language === "zh" ? "删除中…" : "Deleting…") : tx("Delete")}</button></div></div>)}</div>}</section>
+            <section className="panel address-create-panel"><h2>{tx(editingAddressId ? "Edit address" : "Add address")}</h2><form onSubmit={addAddress} className="address-create-form"><label>{tx("Address category")}<select required value={addressCategory} onChange={(event) => { const value = event.target.value; setAddressCategory(value === "sender" || value === "receiver" ? value : ""); }}><option value="">{tx("Choose a category")}</option><option value="sender">{tx("Sender")}</option><option value="receiver">{tx("Receiver")}</option></select></label><label>{tx("Company or name")}<input required value={newAddress.company} onChange={(event) => void updateNewAddress("company", event.target.value)} /></label><label>{tx("Address 1")}<input required value={newAddress.address1} onChange={(event) => void updateNewAddress("address1", event.target.value)} /></label><label>{tx("Address 2")} <small>{tx("Optional")}</small><input value={newAddress.address2} onChange={(event) => void updateNewAddress("address2", event.target.value)} /></label><div className="address-location-row"><label>{tx("Postal code")}<input required maxLength={5} inputMode="numeric" value={newAddress.zip} onChange={(event) => void updateNewAddress("zip", event.target.value.replace(/\D/g, "").slice(0, 5))} /></label><label>{tx("State")}<input required maxLength={2} value={newAddress.state} onChange={(event) => void updateNewAddress("state", event.target.value.toUpperCase())} /></label><label>{tx("City")}<input required value={newAddress.city} onChange={(event) => void updateNewAddress("city", event.target.value)} /></label></div><div className="address-location-row"><label>{tx("Contact")}<input value={newAddress.contact} onChange={(event) => void updateNewAddress("contact", event.target.value)} /></label><label className="span-two">{tx("Phone")}<input value={newAddress.phone} onChange={(event) => void updateNewAddress("phone", event.target.value)} /></label></div><label>{tx("Email")} <small>{tx("Optional")}</small><input type="email" value={newAddress.email} onChange={(event) => void updateNewAddress("email", event.target.value)} /></label><div className="address-form-actions"><button type="submit" disabled={savingAddress}>{savingAddress ? tx("Please wait…") : tx(editingAddressId ? "Update address" : "Save address")}</button>{editingAddressId && <button type="button" className="secondary-action" onClick={cancelAddressEdit}>{tx("Cancel")}</button>}</div></form>{addressPageMessage && <p className="settings-success">{addressPageMessage}</p>}{addressBookError && <p className="address-book-error">{addressBookError}</p>}</section>
+            <section className="panel address-directory"><div className="directory-heading"><h2>{tx("Saved addresses")}</h2><span>{addressBookEntries.length}</span></div>{addressBookLoading ? <p className="address-book-empty">{tx("Loading addresses…")}</p> : addressBookEntries.length === 0 ? <p className="address-book-empty">{tx("No saved addresses yet.")}</p> : <div className="address-book-list">{addressBookEntries.map((entry) => <div className="address-book-card" key={entry.id}><div className="address-book-select"><strong>{entry.company}</strong><span>{tx(entry.category === "sender" ? "Sender" : entry.category === "receiver" ? "Receiver" : "Uncategorized")}</span><span>{entry.address1}{entry.address2 ? `, ${entry.address2}` : ""}</span><span>{entry.city}, {entry.state} {entry.zip}</span><small>{entry.contact}{entry.phone ? ` · ${entry.phone}` : ""}</small></div><div className="address-card-actions"><button type="button" className="address-book-edit" onClick={() => editAddress(entry)}>{tx("Edit")}</button><button type="button" className="address-book-delete" onClick={() => void deleteAddress(entry)} disabled={deletingAddressId === entry.id}>{deletingAddressId === entry.id ? (language === "zh" ? "删除中…" : "Deleting…") : tx("Delete")}</button></div></div>)}</div>}</section>
           </div>
         </div>
 
@@ -1370,7 +1379,7 @@ export default function Home() {
           <section className="address-book-dialog" role="dialog" aria-modal="true" aria-labelledby="address-book-title" onMouseDown={(event) => event.stopPropagation()}>
             <header><div><p className="eyebrow">{language === "zh" ? "已保存地址" : "SAVED ADDRESSES"}</p><h2 id="address-book-title">{language === "zh" ? `选择${addressBookTarget === "sender" || addressBookTarget === "route-origin" ? "发货人" : "收货人"}` : `Choose ${addressBookTarget === "sender" || addressBookTarget === "route-origin" ? "sender" : "receiver"}`}</h2></div><button type="button" onClick={() => setAddressBookTarget(null)} aria-label="Close address book">×</button></header>
             {addressBookError && <p className="address-book-error" role="alert">{addressBookError}</p>}
-            {addressBookLoading ? <p className="address-book-empty">{tx("Loading addresses…")}</p> : addressBookEntries.length === 0 ? <p className="address-book-empty">{language === "zh" ? "暂时没有已保存地址。保存下单资料时选择“保存到地址簿”即可添加。" : "No saved addresses yet. Choose “Save to address book” when saving booking details."}</p> : <div className="address-book-list">{addressBookEntries.map((entry) => <div className="address-book-card" key={entry.id}><button type="button" className="address-book-select" onClick={() => chooseAddress(entry)}><strong>{entry.company}</strong><span>{entry.address1}{entry.address2 ? `, ${entry.address2}` : ""}</span><span>{entry.city}, {entry.state} {entry.zip}</span><small>{entry.contact}{entry.phone ? ` · ${entry.phone}` : ""}</small></button><button type="button" className="address-book-delete" onClick={() => void deleteAddress(entry)} disabled={deletingAddressId === entry.id}>{deletingAddressId === entry.id ? (language === "zh" ? "删除中…" : "Deleting…") : tx("Delete")}</button></div>)}</div>}
+            {addressBookLoading ? <p className="address-book-empty">{tx("Loading addresses…")}</p> : pickerAddresses.length === 0 ? <p className="address-book-empty">{language === "zh" ? "暂时没有已保存地址。保存下单资料时选择“保存到地址簿”即可添加。" : "No saved addresses yet. Choose “Save to address book” when saving booking details."}</p> : <div className="address-book-list">{pickerAddresses.map((entry) => <div className="address-book-card" key={entry.id}><button type="button" className="address-book-select" onClick={() => chooseAddress(entry)}><strong>{entry.company}</strong><span>{entry.address1}{entry.address2 ? `, ${entry.address2}` : ""}</span><span>{entry.city}, {entry.state} {entry.zip}</span><small>{entry.contact}{entry.phone ? ` · ${entry.phone}` : ""}</small></button><button type="button" className="address-book-delete" onClick={() => void deleteAddress(entry)} disabled={deletingAddressId === entry.id}>{deletingAddressId === entry.id ? (language === "zh" ? "删除中…" : "Deleting…") : tx("Delete")}</button></div>)}</div>}
           </section>
         </div>
       )}
