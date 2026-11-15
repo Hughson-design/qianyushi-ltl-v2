@@ -507,3 +507,8 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
   .password-initializer { grid-column: 1 / -1; }
   .help-list { grid-template-columns: 1fr; }
 }
+
+.address-category-options { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 0; border: 0; }
+.address-category-options legend { margin-bottom: 6px; font-weight: 700; }
+.address-category-options label { display: inline-flex; align-items: center; gap: 7px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.address-category-options input[type="checkbox"] { width: auto; height: auto; margin: 0; accent-color: var(--green); }
