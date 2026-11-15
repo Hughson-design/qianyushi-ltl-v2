@@ -26,7 +26,7 @@ type Rate = {
   transit: string;
   price: number;
   badge?: string;
-  provider?: "wwex" | "priority1" | "tql";
+  provider?: "wwex" | "priority1" | "tql" | "mothership";
   providerRef?: Record<string, string | number>;
 };
 
@@ -409,6 +409,8 @@ export default function Home() {
   const priority1Count = visibleRates.filter((rate) => rate.provider === "priority1").length;
   const tqlCount = visibleRates.filter((rate) => rate.provider === "tql").length;
   const wwexCount = visibleRates.filter((rate) => rate.provider === "wwex").length;
+  const mothershipCount = visibleRates.filter((rate) => rate.provider === "mothership").length;
+  const mothershipSelected = selectedRate !== null && rates[selectedRate]?.provider === "mothership";
   const selectedPrice = selectedRate === null ? 0 : rates[selectedRate]?.price ?? 0;
   const balanceAfter = useMemo(() => deposit - selectedPrice, [selectedPrice]);
   const filteredQuotes = useMemo(() => {
@@ -1045,10 +1047,10 @@ export default function Home() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to get rates.");
 
-      const normalized: Rate[] = data.rates.map((rate: { provider: "wwex" | "priority1" | "tql"; carrier: string; service: string; transitDays: number | null; price: number; providerRef: Record<string, string | number>; quoteToken: string }) => ({
+      const normalized: Rate[] = data.rates.map((rate: { provider: "wwex" | "priority1" | "tql" | "mothership"; carrier: string; service: string; transitDays: number | null; price: number; providerRef: Record<string, string | number>; quoteToken: string }) => ({
         quoteToken: rate.quoteToken,
         carrier: rate.carrier,
-        service: `${rate.provider === "wwex" ? "WWEX" : rate.provider === "tql" ? "TQL" : "Priority1"} · ${rate.service}`,
+        service: `${rate.provider === "wwex" ? "WWEX" : rate.provider === "tql" ? "TQL" : rate.provider === "mothership" ? "Mothership Sandbox" : "Priority1"} · ${rate.service}`,
         transit: rate.transitDays ? `${rate.transitDays} ${rate.transitDays === 1 ? "day" : "days"}` : "Not provided",
         price: rate.price,
         provider: rate.provider,
@@ -1243,15 +1245,16 @@ export default function Home() {
 
           {rates.length > 0 && (
             <section className="rates-section" id="rates">
-              <div className="rates-heading"><div><p className="eyebrow">{tx("QUOTE RESULTS")}</p><h2>{tx("Choose a rate")}</h2><p>{origin} → {destination}</p></div><span>P {priority1Count} · T {tqlCount} · W {wwexCount}</span></div>
+              <div className="rates-heading"><div><p className="eyebrow">{tx("QUOTE RESULTS")}</p><h2>{tx("Choose a rate")}</h2><p>{origin} → {destination}</p></div><span>P {priority1Count} · T {tqlCount} · W {wwexCount}{mothershipCount > 0 && ` · M ${mothershipCount}`}</span></div>
               <div className="rate-list">
                 {visibleRates.map((rate, index) => (
-                  <button type="button" className={`rate-card ${selectedRate === index ? "selected" : ""}`} key={`${rate.provider}-${rate.carrier}-${rate.price}`} onClick={() => { setSelectedRate(index); setBookingOpen(false); }} onDoubleClick={() => { setSelectedRate(index); openBooking(); }}>
+                  <button type="button" className={`rate-card ${selectedRate === index ? "selected" : ""}`} key={`${rate.provider}-${rate.carrier}-${rate.price}`} onClick={() => { setSelectedRate(index); setBookingOpen(false); }} onDoubleClick={() => { setSelectedRate(index); if (rate.provider !== "mothership") openBooking(); }}>
                     <span className="rate-provider" aria-hidden="true">{rate.provider?.[0].toUpperCase()}</span><span className="radio"><i /></span><span className="carrier"><strong>{rate.carrier}</strong><small>{rate.service}</small></span><span className="transit"><small>{tx("Transit days")}</small><strong>{language === "zh" ? tx(rate.transit).replace(/^(\d+) days?$/, "$1 天") : rate.transit}</strong></span>{rate.badge && <span className="rate-badge">{tx(rate.badge)}</span>}<span className="price"><strong>${rate.price.toFixed(2)}</strong><small>{tx("Customer price")}</small></span>
                   </button>
                 ))}
               </div>
-              {selectedRate !== null && <div className="selection-bar"><div><span>{tx("Deposit after BOL")}</span><strong>${balanceAfter.toLocaleString(language === "zh" ? "zh-CN" : "en-US", { minimumFractionDigits: 2 })}</strong></div><p>{language === "zh" ? `生成 BOL 时将扣除 $${selectedPrice.toFixed(2)}。` : `$${selectedPrice.toFixed(2)} will be deducted when the BOL is generated.`}</p><button type="button" onClick={openBooking}>{tx("Continue to booking →")}</button></div>}
+              {mothershipSelected && <p className="quotes-empty">{language === "zh" ? "Mothership 沙盒报价仅供比较，暂未开放下单。" : "Mothership sandbox rates are available for comparison only."}</p>}
+              {selectedRate !== null && !mothershipSelected && <div className="selection-bar"><div><span>{tx("Deposit after BOL")}</span><strong>${balanceAfter.toLocaleString(language === "zh" ? "zh-CN" : "en-US", { minimumFractionDigits: 2 })}</strong></div><p>{language === "zh" ? `生成 BOL 时将扣除 $${selectedPrice.toFixed(2)}。` : `$${selectedPrice.toFixed(2)} will be deducted when the BOL is generated.`}</p><button type="button" onClick={openBooking}>{tx("Continue to booking →")}</button></div>}
             </section>
           )}
 
