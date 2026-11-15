@@ -3,6 +3,7 @@ import { verifyShipmentProof } from "@/lib/quote-integrity";
 
 import { dispatchPriority1Shipment } from "@/lib/carriers/priority1";
 import type { StoredQuote } from "@/lib/carriers/shipment-types";
+import { dispatchTqlShipment } from "@/lib/carriers/tql";
 import { dispatchWwexShipment } from "@/lib/carriers/wwex";
 import { responseError, supabaseRequest, supabaseRpc } from "@/lib/supabase-server";
 import { AppSession, customerFilter, requireAppSession } from "@/lib/auth-server";
@@ -39,7 +40,9 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
 
     let booking;
     try {
-      booking = quote.provider === "priority1" ? await dispatchPriority1Shipment(quote) : await dispatchWwexShipment(quote);
+      if (quote.provider === "priority1") booking = await dispatchPriority1Shipment(quote);
+      else if (quote.provider === "tql") booking = await dispatchTqlShipment(quote);
+      else booking = await dispatchWwexShipment(quote);
     } catch (error) {
       await supabaseRpc("release_quote_bol_reservation", auth.session.customerId
         ? { p_quote_id: id, p_customer_id: auth.session.customerId, p_actor_user_id: auth.session.userId }
