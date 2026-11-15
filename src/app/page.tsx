@@ -325,6 +325,40 @@ export default function Home() {
     void checkSession();
   }, []);
 
+  useEffect(() => {
+    if (authState !== "ready") return;
+    let checking = false;
+    let disposed = false;
+    async function verifySession() {
+      if (checking || document.visibilityState !== "visible") return;
+      checking = true;
+      try {
+        const response = await fetch("/api/auth/session", { cache: "no-store" });
+        if (!response.ok) return;
+        const session = await response.json();
+        if (!disposed && !session.authenticated) {
+          setAuthUser(null);
+          setAuthState("login");
+          setAuthForm((form) => ({ ...form, password: "" }));
+          setAuthError(language === "zh" ? "会话已结束，请重新登录。" : "Your session ended. Please sign in again.");
+        }
+      } catch {
+        // A temporary network failure can be checked on the next poll.
+      } finally {
+        checking = false;
+      }
+    }
+    const timer = window.setInterval(verifySession, 10_000);
+    window.addEventListener("focus", verifySession);
+    document.addEventListener("visibilitychange", verifySession);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", verifySession);
+      document.removeEventListener("visibilitychange", verifySession);
+    };
+  }, [authState, language]);
+
   async function checkSession() {
     try {
       const response = await fetch("/api/auth/session", { cache: "no-store" });
