@@ -23,6 +23,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     if (quote.status === "void") return NextResponse.json({ quote });
     if (quote.status !== "booked" || !quote.provider_shipment_id) return NextResponse.json({ error: "Only a booked shipment can be voided." }, { status: 409 });
 
+    if (quote.provider === "tql") return NextResponse.json({ error: "Contact TQL to cancel this shipment. No deposit has been refunded." }, { status: 409 });
     if (quote.provider === "priority1") await cancelPriority1Shipment(quote.provider_shipment_id);
     else {
       const pickupId = quote.provider_pickup_id || (quote.bol_number ? await getWwexPickupIdByBol(quote.bol_number) : null);
