@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { issueQuoteToken } from "@/lib/quote-integrity";
 
 import { getPriority1Rates } from "@/lib/carriers/priority1";
 import type { NormalizedRate, QuoteLineItem, QuoteLocation, QuoteRequest } from "@/lib/carriers/types";
@@ -93,6 +94,8 @@ export async function POST(request: Request) {
   try {
     const auth = await requireAppSession();
     if (auth.response || !auth.session) return auth.response;
+    const customerId = auth.session.customerId;
+    if (!customerId) return NextResponse.json({ error: "An active customer account is required." }, { status: 403 });
     const body = await request.json();
     const originZip = String(body.originZip || "").trim();
     const destinationZip = String(body.destinationZip || "").trim();
@@ -127,12 +130,15 @@ export async function POST(request: Request) {
     const rates = [
       ...cheapestFive(wwex.status === "fulfilled" ? wwex.value : []),
       ...cheapestFive(priority1.status === "fulfilled" ? priority1.value : []),
-    ].map((rate) => customerRate(rate, pricing.markupPercent, pricing.minimumMarkup)).sort((a, b) => a.price - b.price);
+    ].filter((rate) => Number.isFinite(rate.price) && rate.price > 0).map((rate) => customerRate(rate, pricing.markupPercent, pricing.minimumMarkup)).sort((a, b) => a.price - b.price);
 
     if (rates.length === 0) {
       return NextResponse.json({ error: "No rates were returned by the connected carriers.", providerErrors }, { status: 502 });
     }
-    return NextResponse.json({ rates, providerErrors });
+    return NextResponse.json({ rates: rates.map((rate) => ({
+      ...rate,
+      quoteToken: issueQuoteToken(customerId, rate, { originZip, destinationZip, readyDate, items: quoteRequest.items.map((item, index) => ({ ...item, unitWeight: Number(body.items[index].unitWeight) })), services: quoteRequest.services }),
+    })), providerErrors });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to request rates." }, { status: 400 });
   }
