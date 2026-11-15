@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     const schema = await authSchemaStatus();
-    if (!schema.ready) return NextResponse.json({ authenticated: true, legacy: true, user: await getAppSession() });
+    if (!schema.ready) return NextResponse.json({ error: "Authentication storage is unavailable." }, { status: 503 });
     if (!schema.hasUsers) return NextResponse.json({ authenticated: false, setupRequired: true });
     const user = await getAppSession();
     return NextResponse.json({ authenticated: Boolean(user), setupRequired: false, user });
