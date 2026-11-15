@@ -14,6 +14,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const auth = await requireAppSession();
     if (auth.response || !auth.session) return auth.response;
     const body = await request.json();
+    const { category } = body;
+    if (category !== undefined && category !== "sender" && category !== "receiver") {
+      return NextResponse.json({ error: "Invalid address category." }, { status: 400 });
+    }
     const address = Object.fromEntries(addressFields.map((field) => [field, String(body[field] || "").trim()]));
     if (!address.company || !address.address1 || !/^\d{5}$/.test(address.zip) || !address.state || !address.city) {
       return NextResponse.json({ error: "Company, address, ZIP, state, and city are required." }, { status: 400 });
@@ -21,7 +25,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const response = await supabaseRequest(`address_book?id=eq.${encodeURIComponent(id)}${customerFilter(auth.session)}`, {
       method: "PATCH",
       headers: { Prefer: "return=representation" },
-      body: JSON.stringify({ ...address, country: address.country || "United States", state: address.state.toUpperCase(), updated_at: new Date().toISOString() }),
+      body: JSON.stringify({ ...address, ...(category === undefined ? {} : { category }), country: address.country || "United States", state: address.state.toUpperCase(), updated_at: new Date().toISOString() }),
     });
     if (!response.ok) return NextResponse.json({ error: await responseError(response, "Unable to update this address.") }, { status: 502 });
     const rows = await response.json();
