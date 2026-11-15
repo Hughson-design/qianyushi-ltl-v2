@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { verifyShipmentProof } from "@/lib/quote-integrity";
 
 import { dispatchPriority1Shipment } from "@/lib/carriers/priority1";
 import type { StoredQuote } from "@/lib/carriers/shipment-types";
@@ -26,6 +27,10 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     if (!quote) return NextResponse.json({ error: "Quote not found." }, { status: 404 });
     if (quote.status === "booked") return NextResponse.json({ quote });
     if (quote.status !== "draft") return NextResponse.json({ error: "This quote cannot generate a BOL in its current status." }, { status: 409 });
+
+    if (!auth.session.customerId || !verifyShipmentProof(quote.provider_ref?.shipmentProof, id, auth.session.customerId)) {
+      return NextResponse.json({ error: "This draft predates verified pricing. Copy it and request fresh rates before booking." }, { status: 409 });
+    }
 
     const reserve = await supabaseRpc("reserve_quote_for_bol", auth.session.customerId
       ? { p_quote_id: id, p_customer_id: auth.session.customerId, p_actor_user_id: auth.session.userId }
