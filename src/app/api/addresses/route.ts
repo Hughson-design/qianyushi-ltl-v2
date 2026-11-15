@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     }
 
     const { category } = body;
-    if (category !== undefined && category !== "sender" && category !== "receiver") {
+    if (category !== undefined && category !== "sender" && category !== "receiver" && category !== "both") {
       return NextResponse.json({ error: "Invalid address category." }, { status: 400 });
     }
     const record = Object.fromEntries(addressFields.map((field) => [field, clean(body[field])]));
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     const conflict = auth.session.customerId ? "customer_id,fingerprint" : "fingerprint";
     const response = await supabaseRequest(`address_book?on_conflict=${conflict}`, {
       method: "POST",
-      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+      headers: { Prefer: body.keepExisting === true ? "resolution=ignore-duplicates,return=representation" : "resolution=merge-duplicates,return=representation" },
       body: JSON.stringify({ ...ownedRecord, ...(category === undefined ? {} : { category }), fingerprint, updated_at: new Date().toISOString() }),
     });
     if (!response.ok) return addressStorageError(response.status, await responseError(response, "Unable to save this address."));
