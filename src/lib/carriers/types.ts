@@ -28,7 +28,7 @@ export type QuoteRequest = {
 };
 
 export type NormalizedRate = {
-  provider: "wwex" | "priority1" | "mothership";
+  provider: "wwex" | "priority1" | "tql" | "mothership";
   carrier: string;
   carrierCode?: string;
   service: string;
