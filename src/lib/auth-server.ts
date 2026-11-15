@@ -28,17 +28,7 @@ function publishableKey() {
   return key;
 }
 
-// Only a genuine "the app_users table does not exist yet" response should ever
-// unlock the pre-login legacy/setup path. PostgREST reports that specific case
-// with code PGRST205 ("could not find the table in the schema cache"); a plain
-// Postgres connection would raise 42P01 (undefined_table) instead. Any other
-// failure (wrong secret key, RLS misconfiguration, a transient 5xx, rate
-// limiting, ...) must NOT be treated the same way, because getAppSession()
-// grants a full, unauthenticated administrator session whenever schema.ready
-// is false. Matching on those exact codes - instead of loosely checking
-// whether the error text happens to contain the string "app_users" - closes
-// off every case where an unrelated error could be misread as "not migrated
-// yet" and silently hand out admin access to anyone.
+// Recognize a missing auth table for setup status.
 function isSchemaMissingTableError(status: number, detail: string) {
   if (status === 404) return true;
   try {
@@ -100,7 +90,7 @@ async function profileForUser(userId: string) {
 export async function getAppSession(): Promise<AppSession | null> {
   const schema = await authSchemaStatus();
   if (!schema.ready) {
-    return { userId: "legacy-admin", customerId: null, customerName: "Shenzhen Qianyushi Supply Chain Service Co.,Ltd.", email: "", name: "Cathy Huang", role: "admin", canSelfBook: true, legacy: true };
+    return null;
   }
   if (!schema.hasUsers) return null;
 
@@ -112,7 +102,7 @@ export async function getAppSession(): Promise<AppSession | null> {
   const authUser = await userResponse.json();
   const profile = await profileForUser(String(authUser.id || ""));
   const homeCustomer = Array.isArray(profile?.customers) ? profile.customers[0] : profile?.customers;
-  if (!profile?.active || (homeCustomer && homeCustomer.active === false)) return null;
+  if (!profile?.active || !profile.customer_id || homeCustomer?.active !== true) return null;
   let activeCustomer = homeCustomer;
   let customerId = profile.customer_id || null;
   if (profile.role === "admin" || profile.role === "operations") {
