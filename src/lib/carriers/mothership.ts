@@ -33,8 +33,8 @@ export async function getMothershipRates(input: QuoteRequest): Promise<Normalize
     signal: AbortSignal.timeout(30_000),
     headers: { Authorization: "Bearer " + token, "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({
-      pickup: { address: { zip: input.origin.zip }, accessorials: pickup },
-      delivery: { address: { zip: input.destination.zip }, accessorials: delivery },
+      pickup: { address: { zip: input.origin.zip }, accessorials: pickup, openTime: "0900", closeTime: "1700" },
+      delivery: { address: { zip: input.destination.zip }, accessorials: delivery, openTime: "0900", closeTime: "1700" },
       pickupReadyDate: { date: input.readyDate, time: "0900" },
       applyAvailableCredits: false,
       freight: input.items.map((item) => ({
