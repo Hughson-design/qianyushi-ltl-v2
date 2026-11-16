@@ -1153,6 +1153,24 @@ export default function Home() {
     );
   }
 
+  const quoteProgress = (loading || Object.keys(rateProgress).length > 0) ? (
+    <section className="quote-progress" aria-label={language === "zh" ? "询价进度" : "Quote progress"}>
+      <progress aria-label={language === "zh" ? "已处理的平台" : "Quote sources processed"} max={4} value={Object.values(rateProgress).filter((entry) => entry.status !== "pending").length} />
+      <div className="quote-progress-items" aria-live="polite">
+        {(Object.keys(rateProviderLabels) as RateProvider[]).map((id) => {
+          const entry = rateProgress[id];
+          const status = entry?.status ?? (loading ? "pending" : "failed");
+          const label = language === "zh"
+            ? { pending: "等待中", done: "完成", empty: "无报价", failed: "失败", disabled: "未启用" }[status]
+            : { pending: "Waiting", done: "Done", empty: "No rates", failed: "Failed", disabled: "Disabled" }[status];
+          const symbol = { pending: "…", done: "✓", empty: "∅", failed: "!", disabled: "–" }[status];
+          const elapsed = entry?.elapsedMs === undefined ? "" : `${(entry.elapsedMs / 1000).toFixed(1)}s`;
+          return <span key={id} title={label} aria-label={`${id[0].toUpperCase()} · ${label}${elapsed ? ` · ${elapsed}` : ""}`}>{id[0].toUpperCase()} <span aria-hidden="true">{symbol}{elapsed && ` ${elapsed}`}</span></span>;
+        })}
+      </div>
+    </section>
+  ) : null;
+
   if (quickQuote) {
     return (
       <main className="quick-quote" lang={language === "zh" ? "zh-CN" : "en"}>
@@ -1163,13 +1181,15 @@ export default function Home() {
         <form onSubmit={getRates} className="smart-quote-panel">
           <h1><label htmlFor="quick-quote-text">SMART QUOTE</label></h1>
           <div className="smart-input-row">
-            <textarea id="quick-quote-text" required rows={5} value={smartText} placeholder={smartQuoteExample} onChange={(event) => {
+            <textarea id="quick-quote-text" required disabled={loading} rows={5} value={smartText} placeholder={smartQuoteExample} onChange={(event) => {
               setSmartText(event.target.value);
+              setRateProgress({});
               setRates([]);
               setQuoteMessage("");
             }} />
             <button type="submit" disabled={loading || !readyDate}>{tx(loading ? "Comparing carriers…" : "Get rates")}</button>
           </div>
+          {quoteProgress}
         </form>
         {quoteMessage && <p className="quote-message" role="status">{quoteMessage}</p>}
         {visibleRates.length > 0 && (
@@ -1322,23 +1342,7 @@ export default function Home() {
             <div className="form-footer">
               <div><span className="shield">✓</span><p><strong>{tx("Your rates are private")}</strong><small>{tx("Customers only see the final selling price.")}</small></p></div>
               <div className="quote-rate-actions">
-                {(loading || Object.keys(rateProgress).length > 0) && (
-                  <section className="quote-progress" aria-label={language === "zh" ? "询价进度" : "Quote progress"}>
-                    <progress aria-label={language === "zh" ? "已处理的平台" : "Quote sources processed"} max={4} value={Object.values(rateProgress).filter((entry) => entry.status !== "pending").length} />
-                    <div className="quote-progress-items" aria-live="polite">
-                      {(Object.keys(rateProviderLabels) as RateProvider[]).map((id) => {
-                        const entry = rateProgress[id];
-                        const status = entry?.status ?? (loading ? "pending" : "failed");
-                        const label = language === "zh"
-                          ? { pending: "等待中", done: "完成", empty: "无报价", failed: "失败", disabled: "未启用" }[status]
-                          : { pending: "Waiting", done: "Done", empty: "No rates", failed: "Failed", disabled: "Disabled" }[status];
-                        const symbol = { pending: "…", done: "✓", empty: "∅", failed: "!", disabled: "–" }[status];
-                        const elapsed = entry?.elapsedMs === undefined ? "" : `${(entry.elapsedMs / 1000).toFixed(1)}s`;
-                        return <span key={id} title={label} aria-label={`${id[0].toUpperCase()} · ${label}${elapsed ? ` · ${elapsed}` : ""}`}>{id[0].toUpperCase()} <span aria-hidden="true">{symbol}{elapsed && ` ${elapsed}`}</span></span>;
-                      })}
-                    </div>
-                  </section>
-                )}
+                {quoteProgress}
                 <button className="primary-button" disabled={loading} aria-busy={loading}>{tx("Get rates")}<span>→</span></button>
               </div>
             </div>
