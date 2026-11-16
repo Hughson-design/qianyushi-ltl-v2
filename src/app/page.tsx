@@ -1156,6 +1156,10 @@ export default function Home() {
   if (quickQuote) {
     return (
       <main className="quick-quote" lang={language === "zh" ? "zh-CN" : "en"}>
+        <header className="brand quick-quote-brand">
+          <Image className="brand-logo" src="/qianvushi-logo.jpg" alt="" width={52} height={52} priority />
+          <div><strong>SHENZHEN QIANYUSHI</strong><span>SUPPLY CHAIN SERVICE CO., LTD.</span></div>
+        </header>
         <form onSubmit={getRates} className="smart-quote-panel">
           <h1><label htmlFor="quick-quote-text">SMART QUOTE</label></h1>
           <div className="smart-input-row">
