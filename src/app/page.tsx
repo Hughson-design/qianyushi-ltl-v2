@@ -1274,23 +1274,29 @@ export default function Home() {
               </div>
             </section>
 
-            {(loading || Object.keys(rateProgress).length > 0) && (
-              <section className="panel" aria-label={language === "zh" ? "询价进度" : "Quote progress"}>
-                <strong>{language === "zh" ? "询价进度" : "Quote progress"}</strong>
-                <progress aria-label={language === "zh" ? "已完成的平台" : "Carriers finished"} max={4} value={Object.values(rateProgress).filter((entry) => entry.status !== "pending").length} style={{ display: "block", width: "100%", marginBlock: 8 }} />
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 20px" }} aria-live="polite">
-                  {(Object.keys(rateProviderLabels) as RateProvider[]).map((id) => {
-                    const entry = rateProgress[id];
-                    const status = entry?.status ?? (loading ? "pending" : "failed");
-                    const label = language === "zh"
-                      ? { pending: "等待中", done: "完成", empty: "无报价", failed: "失败", disabled: "未启用" }[status]
-                      : { pending: "Waiting", done: "Done", empty: "No rates", failed: "Failed", disabled: "Disabled" }[status];
-                    return <span key={id}>{rateProviderLabels[id]} · {label}{entry?.elapsedMs !== undefined && ` · ${(entry.elapsedMs / 1000).toFixed(1)} s`}</span>;
-                  })}
-                </div>
-              </section>
-            )}
-            <div className="form-footer"><div><span className="shield">✓</span><p><strong>{tx("Your rates are private")}</strong><small>{tx("Customers only see the final selling price.")}</small></p></div><button className="primary-button" disabled={loading}>{tx(loading ? "Comparing carriers…" : "Get rates")}<span>→</span></button></div>
+            <div className="form-footer">
+              <div><span className="shield">✓</span><p><strong>{tx("Your rates are private")}</strong><small>{tx("Customers only see the final selling price.")}</small></p></div>
+              <div className="quote-rate-actions">
+                {(loading || Object.keys(rateProgress).length > 0) && (
+                  <section className="quote-progress" aria-label={language === "zh" ? "询价进度" : "Quote progress"}>
+                    <progress aria-label={language === "zh" ? "已处理的平台" : "Quote sources processed"} max={4} value={Object.values(rateProgress).filter((entry) => entry.status !== "pending").length} />
+                    <div className="quote-progress-items" aria-live="polite">
+                      {(Object.keys(rateProviderLabels) as RateProvider[]).map((id) => {
+                        const entry = rateProgress[id];
+                        const status = entry?.status ?? (loading ? "pending" : "failed");
+                        const label = language === "zh"
+                          ? { pending: "等待中", done: "完成", empty: "无报价", failed: "失败", disabled: "未启用" }[status]
+                          : { pending: "Waiting", done: "Done", empty: "No rates", failed: "Failed", disabled: "Disabled" }[status];
+                        const symbol = { pending: "…", done: "✓", empty: "∅", failed: "!", disabled: "–" }[status];
+                        const elapsed = entry?.elapsedMs === undefined ? "" : `${(entry.elapsedMs / 1000).toFixed(1)}s`;
+                        return <span key={id} title={label} aria-label={`${id[0].toUpperCase()} · ${label}${elapsed ? ` · ${elapsed}` : ""}`}>{id[0].toUpperCase()} <span aria-hidden="true">{symbol}{elapsed && ` ${elapsed}`}</span></span>;
+                      })}
+                    </div>
+                  </section>
+                )}
+                <button className="primary-button" disabled={loading} aria-busy={loading}>{tx("Get rates")}<span>→</span></button>
+              </div>
+            </div>
             {quoteMessage && <p className="quote-message" role="status">{quoteMessage}</p>}
           </form>
 
