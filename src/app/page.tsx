@@ -19,6 +19,10 @@ type FreightItem = {
   declaredValue: string;
 };
 
+const rateProviderLabels = { priority1: "Priority1", tql: "TQL", wwex: "WWEX", mothership: "Mothership" } as const;
+type RateProvider = keyof typeof rateProviderLabels;
+type RateProgress = { status: "pending" | "done" | "empty" | "failed" | "disabled"; elapsedMs?: number };
+
 type Rate = {
   quoteToken: string;
   carrier: string;
@@ -264,6 +268,7 @@ export default function Home() {
     skipAddressVerification: false,
   });
   const [loading, setLoading] = useState(false);
+  const [rateProgress, setRateProgress] = useState<Partial<Record<RateProvider, RateProgress>>>({});
   const [quoteMessage, setQuoteMessage] = useState("");
   const [origin, setOrigin] = useState("91761");
   const [destination, setDestination] = useState("75247");
@@ -1024,13 +1029,14 @@ export default function Home() {
   async function getRates(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
+    setRateProgress({});
     setSelectedRate(null);
     setBookingOpen(false);
     setQuoteMessage("");
     try {
       const response = await fetch("/api/quotes/rates", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
         body: JSON.stringify({
           originZip: origin,
           destinationZip: destination,
@@ -1044,8 +1050,37 @@ export default function Home() {
           })),
         }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Unable to get rates.");
+      let data;
+      if (response.headers.get("content-type")?.includes("application/x-ndjson") && response.body) {
+        const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+        let buffer = "";
+        try {
+          while (true) {
+            const chunk = await reader.read();
+            if (chunk.done) break;
+            buffer += chunk.value;
+            const lines = buffer.split("\n");
+            buffer = lines.pop() ?? "";
+            for (const line of lines) {
+              if (!line) continue;
+              const event = JSON.parse(line);
+              if (event.type === "provider" && Object.hasOwn(rateProviderLabels, event.id)) {
+                setRateProgress((current) => ({ ...current, [event.id]: { status: event.status, elapsedMs: event.elapsedMs } }));
+              } else if (event.type === "result") {
+                if (!event.ok) throw new Error(event.data.error || "Unable to get rates.");
+                data = event.data;
+              }
+            }
+          }
+        } finally {
+          await reader.cancel();
+          reader.releaseLock();
+        }
+        if (!data) throw new Error("The quote request ended before results arrived.");
+      } else {
+        data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Unable to get rates.");
+      }
 
       const normalized: Rate[] = data.rates.map((rate: { provider: "wwex" | "priority1" | "tql" | "mothership"; carrier: string; service: string; transitDays: number | null; price: number; providerRef: Record<string, string | number>; quoteToken: string }) => ({
         quoteToken: rate.quoteToken,
@@ -1239,6 +1274,22 @@ export default function Home() {
               </div>
             </section>
 
+            {(loading || Object.keys(rateProgress).length > 0) && (
+              <section className="panel" aria-label={language === "zh" ? "询价进度" : "Quote progress"}>
+                <strong>{language === "zh" ? "询价进度" : "Quote progress"}</strong>
+                <progress aria-label={language === "zh" ? "已完成的平台" : "Carriers finished"} max={4} value={Object.values(rateProgress).filter((entry) => entry.status !== "pending").length} style={{ display: "block", width: "100%", marginBlock: 8 }} />
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 20px" }} aria-live="polite">
+                  {(Object.keys(rateProviderLabels) as RateProvider[]).map((id) => {
+                    const entry = rateProgress[id];
+                    const status = entry?.status ?? (loading ? "pending" : "failed");
+                    const label = language === "zh"
+                      ? { pending: "等待中", done: "完成", empty: "无报价", failed: "失败", disabled: "未启用" }[status]
+                      : { pending: "Waiting", done: "Done", empty: "No rates", failed: "Failed", disabled: "Disabled" }[status];
+                    return <span key={id}>{rateProviderLabels[id]} · {label}{entry?.elapsedMs !== undefined && ` · ${(entry.elapsedMs / 1000).toFixed(1)} s`}</span>;
+                  })}
+                </div>
+              </section>
+            )}
             <div className="form-footer"><div><span className="shield">✓</span><p><strong>{tx("Your rates are private")}</strong><small>{tx("Customers only see the final selling price.")}</small></p></div><button className="primary-button" disabled={loading}>{tx(loading ? "Comparing carriers…" : "Get rates")}<span>→</span></button></div>
             {quoteMessage && <p className="quote-message" role="status">{quoteMessage}</p>}
           </form>
