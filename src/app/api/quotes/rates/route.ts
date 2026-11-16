@@ -93,7 +93,7 @@ function customerRate(rate: NormalizedRate, markupPercent: number, minimumMarkup
   return { ...rate, price: Math.round(Math.max(percentagePrice, minimumPrice) * 100) / 100 };
 }
 
-export async function POST(request: Request) {
+async function quoteResponse(request: Request, emit?: (event: object) => void) {
   try {
     const auth = await requireAppSession();
     if (auth.response || !auth.session) return auth.response;
@@ -122,25 +122,33 @@ export async function POST(request: Request) {
     };
 
     const pricing = await pricingSettings(auth.session);
-    const [wwex, priority1, tql, mothership] = await Promise.allSettled([
-      pricing.wwexEnabled ? getWwexRates(quoteRequest) : Promise.resolve([]),
-      pricing.priority1Enabled ? getPriority1Rates(quoteRequest) : Promise.resolve([]),
-      pricing.tqlEnabled ? getTqlRates(quoteRequest) : Promise.resolve([]),
-      getMothershipRates(quoteRequest),
-    ]);
+    const providers = [
+      { id: "wwex", enabled: pricing.wwexEnabled, getRates: getWwexRates },
+      { id: "priority1", enabled: pricing.priority1Enabled, getRates: getPriority1Rates },
+      { id: "tql", enabled: pricing.tqlEnabled, getRates: getTqlRates },
+      { id: "mothership", enabled: Boolean(process.env.MOTHERSHIP_SANDBOX_TOKEN?.trim()), getRates: getMothershipRates },
+    ] as const;
     const providerErrors: Record<string, string> = {};
-    if (wwex.status === "rejected") providerErrors.wwex = wwex.reason instanceof Error ? wwex.reason.message : "WWEX quote failed.";
-    if (priority1.status === "rejected") providerErrors.priority1 = priority1.reason instanceof Error ? priority1.reason.message : "Priority1 quote failed.";
-    if (tql.status === "rejected") providerErrors.tql = tql.reason instanceof Error ? tql.reason.message : "TQL quote failed.";
+    const batches = await Promise.all(providers.map(async ({ id, enabled, getRates }) => {
+      if (!enabled) {
+        emit?.({ type: "provider", id, status: "disabled" });
+        return [];
+      }
+      const started = performance.now();
+      emit?.({ type: "provider", id, status: "pending" });
+      try {
+        const returned = await getRates(quoteRequest);
+        const rates = cheapestFive(returned.filter((rate) => Number.isFinite(rate.price) && rate.price > 0));
+        emit?.({ type: "provider", id, status: rates.length ? "done" : "empty", elapsedMs: Math.round(performance.now() - started) });
+        return rates;
+      } catch (error) {
+        providerErrors[id] = id === "mothership" ? "Mothership sandbox quote failed." : error instanceof Error ? error.message : "Carrier quote failed.";
+        emit?.({ type: "provider", id, status: "failed", elapsedMs: Math.round(performance.now() - started) });
+        return [];
+      }
+    }));
 
-    if (mothership.status === "rejected") providerErrors.mothership = "Mothership sandbox quote failed.";
-
-    const rates = [
-      ...cheapestFive(wwex.status === "fulfilled" ? wwex.value : []),
-      ...cheapestFive(priority1.status === "fulfilled" ? priority1.value : []),
-      ...cheapestFive(tql.status === "fulfilled" ? tql.value : []),
-      ...cheapestFive(mothership.status === "fulfilled" ? mothership.value : []),
-    ].filter((rate) => Number.isFinite(rate.price) && rate.price > 0).map((rate) => customerRate(rate, pricing.markupPercent, pricing.minimumMarkup)).sort((a, b) => a.price - b.price);
+    const rates = batches.flat().map((rate) => customerRate(rate, pricing.markupPercent, pricing.minimumMarkup)).sort((a, b) => a.price - b.price);
 
     if (rates.length === 0) {
       return NextResponse.json({ error: "No rates were returned by the connected carriers.", providerErrors }, { status: 502 });
@@ -152,4 +160,32 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to request rates." }, { status: 400 });
   }
+}
+
+export function POST(request: Request) {
+  if (request.headers.get("accept") !== "application/x-ndjson") return quoteResponse(request);
+
+  const encoder = new TextEncoder();
+  let cancelled = false;
+  const body = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const emit = (event: object) => {
+        if (!cancelled) controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+      };
+
+      try {
+        const response = await quoteResponse(request, emit);
+        emit({ type: "result", ok: response.ok, data: await response.json() });
+      } catch {
+        emit({ type: "result", ok: false, data: { error: "Unable to request rates." } });
+      } finally {
+        if (!cancelled) controller.close();
+      }
+    },
+    cancel() {
+      cancelled = true;
+    },
+  });
+
+  return new Response(body, { headers: { "Content-Type": "application/x-ndjson", "Cache-Control": "no-store" } });
 }
