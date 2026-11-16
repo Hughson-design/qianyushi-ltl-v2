@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     const offer = readQuoteToken(body?.rate?.quoteToken, customerId);
     if (!offer) return NextResponse.json({ error: "Get fresh rates before saving this quote." }, { status: 400 });
     const { rate, shipment } = offer;
-    if (rate.provider === "mothership") return NextResponse.json({ error: "Mothership sandbox rates are for comparison only." }, { status: 409 });
+    if (rate.provider === "mothership") return NextResponse.json({ error: "Mothership rates are for comparison only." }, { status: 409 });
     if (body.sender?.zip !== shipment.originZip || body.receiver?.zip !== shipment.destinationZip || body.readyDate !== shipment.readyDate) {
       return NextResponse.json({ error: "The route or ready date changed. Get fresh rates before saving." }, { status: 400 });
     }
