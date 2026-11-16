@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { issueQuoteToken } from "@/lib/quote-integrity";
 
-import { getMothershipRates } from "@/lib/carriers/mothership";
+import { getMothershipRates, mothershipRatesEnabled } from "@/lib/carriers/mothership";
 import { getPriority1Rates } from "@/lib/carriers/priority1";
 import { getTqlRates } from "@/lib/carriers/tql";
 import type { NormalizedRate, QuoteLineItem, QuoteLocation, QuoteRequest } from "@/lib/carriers/types";
@@ -126,7 +126,7 @@ async function quoteResponse(request: Request, emit?: (event: object) => void) {
       { id: "wwex", enabled: pricing.wwexEnabled, getRates: getWwexRates },
       { id: "priority1", enabled: pricing.priority1Enabled, getRates: getPriority1Rates },
       { id: "tql", enabled: pricing.tqlEnabled, getRates: getTqlRates },
-      { id: "mothership", enabled: Boolean(process.env.MOTHERSHIP_SANDBOX_TOKEN?.trim()), getRates: getMothershipRates },
+      { id: "mothership", enabled: mothershipRatesEnabled(), getRates: getMothershipRates },
     ] as const;
     const providerErrors: Record<string, string> = {};
     const batches = await Promise.all(providers.map(async ({ id, enabled, getRates }) => {
@@ -142,7 +142,7 @@ async function quoteResponse(request: Request, emit?: (event: object) => void) {
         emit?.({ type: "provider", id, status: rates.length ? "done" : "empty", elapsedMs: Math.round(performance.now() - started) });
         return rates;
       } catch (error) {
-        providerErrors[id] = id === "mothership" ? "Mothership sandbox quote failed." : error instanceof Error ? error.message : "Carrier quote failed.";
+        providerErrors[id] = id === "mothership" ? "Mothership quote failed." : error instanceof Error ? error.message : "Carrier quote failed.";
         emit?.({ type: "provider", id, status: "failed", elapsedMs: Math.round(performance.now() - started) });
         return [];
       }
