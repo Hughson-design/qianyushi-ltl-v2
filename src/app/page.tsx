@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { printBol } from "./print-bol";
 import { calculateDensityClass, parseSmartQuote, SmartQuoteResult } from "@/lib/smart-quote-parser";
 
@@ -198,6 +199,7 @@ function Icon({ children }: { children: React.ReactNode }) {
 }
 
 export default function Home() {
+  const quickQuote = usePathname() === "/quick-quote";
   const [language, setLanguage] = useState<"en" | "zh">("en");
   const [helpOpen, setHelpOpen] = useState(false);
   const [authState, setAuthState] = useState<"checking" | "setup" | "login" | "ready" | "signed-out">("checking");
@@ -293,7 +295,7 @@ export default function Home() {
   const [pickupReadyTime, setPickupReadyTime] = useState("09:00");
   const [pickupCloseTime, setPickupCloseTime] = useState("16:00");
   const smartQuoteExample = "Commercial, loading dock, 13602 12th St Unit B, Chino, CA 91710\nResidential, liftgate, appointment, 650 Boulder Drive, Breinigsville, PA 18031\n1 pallet, 110×96×65cm, 177kg, commodity: Furniture\n1 crate, 120×100×180cm, 500kg, non-stackable, commodity: Electronics";
-  const [smartText, setSmartText] = useState(smartQuoteExample);
+  const [smartText, setSmartText] = useState(quickQuote ? "" : smartQuoteExample);
   const [smartResult, setSmartResult] = useState<SmartQuoteResult | null>(null);
   const [deposit, setDeposit] = useState(0);
 
@@ -1028,6 +1030,13 @@ export default function Home() {
 
   async function getRates(event: FormEvent) {
     event.preventDefault();
+    const parsed = quickQuote ? parseSmartQuote(smartText) : null;
+    const freightLineCount = smartText.split(/\r\n?|\n/).filter((line) => line.trim()).length - 2;
+    if (parsed && (parsed.missing.length || parsed.items.length !== freightLineCount)) {
+      setRates([]);
+      setQuoteMessage(language === "zh" ? "请填写发货地址、收货地址，以及每件货物的尺寸和重量。" : "Enter pickup and delivery addresses, plus dimensions and weight for every freight line.");
+      return;
+    }
     setLoading(true);
     setRateProgress({});
     setSelectedRate(null);
@@ -1038,13 +1047,13 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
         body: JSON.stringify({
-          originZip: origin,
-          destinationZip: destination,
-          originAddress,
-          destinationAddress,
+          originZip: parsed?.originZip ?? origin,
+          destinationZip: parsed?.destinationZip ?? destination,
+          originAddress: parsed?.originAddress ?? originAddress,
+          destinationAddress: parsed?.destinationAddress ?? destinationAddress,
           readyDate,
-          services: selectedServices,
-          items: items.map((item) => ({
+          services: parsed?.services ?? selectedServices,
+          items: (parsed?.items ?? items).map((item) => ({
             ...item,
             freightClass: calculateDensityClass(Number(item.length), Number(item.width), Number(item.height), Number(item.unitWeight)),
           })),
@@ -1140,6 +1149,38 @@ export default function Home() {
             </div>
           ) : authState === "checking" ? <p className="auth-subtitle">{tx("Checking the secure workspace.")}</p> : <form onSubmit={submitAuthentication} className="auth-form">{authState === "setup" && <label>{tx("Administrator name")}<input required value={authForm.name} onChange={(event) => setAuthForm((current) => ({ ...current, name: event.target.value }))} autoComplete="name" /></label>}<label>{tx("Email")}<input required type="email" value={authForm.email} onChange={(event) => setAuthForm((current) => ({ ...current, email: event.target.value }))} autoComplete="email" /></label><label>{tx("Password")}<input required minLength={8} type="password" value={authForm.password} onChange={(event) => setAuthForm((current) => ({ ...current, password: event.target.value }))} autoComplete={authState === "setup" ? "new-password" : "current-password"} /></label>{authError && <p className="auth-error" role="alert">{authError}</p>}<button type="submit" disabled={authLoading}>{tx(authLoading ? "Please wait…" : authState === "setup" ? "Create administrator" : "Sign in")}</button>{authState === "setup" && <small>{language === "zh" ? "这是第一个账户，将拥有完整管理员权限。" : "This is the first account and will have full administrator access."}</small>}</form>}
         </section>
+      </main>
+    );
+  }
+
+  if (quickQuote) {
+    return (
+      <main className="quick-quote" lang={language === "zh" ? "zh-CN" : "en"}>
+        <form onSubmit={getRates} className="smart-quote-panel">
+          <h1><label htmlFor="quick-quote-text">SMART QUOTE</label></h1>
+          <div className="smart-input-row">
+            <textarea id="quick-quote-text" required rows={5} value={smartText} placeholder={smartQuoteExample} onChange={(event) => {
+              setSmartText(event.target.value);
+              setRates([]);
+              setQuoteMessage("");
+            }} />
+            <button type="submit" disabled={loading || !readyDate}>{tx(loading ? "Comparing carriers…" : "Get rates")}</button>
+          </div>
+        </form>
+        {quoteMessage && <p className="quote-message" role="status">{quoteMessage}</p>}
+        {visibleRates.length > 0 && (
+          <section className="rates-section" id="rates" aria-label={tx("QUOTE RESULTS")}>
+            <div className="rate-list">
+              {visibleRates.map((rate, index) => (
+                <article className="rate-card" key={`${rate.provider}-${rate.carrier}-${index}`}>
+                  <span className="rate-provider">{rate.provider?.[0].toUpperCase()}</span>
+                  <span className="carrier"><strong>{rate.carrier}</strong><small>{language === "zh" ? tx(rate.transit).replace(/^(\d+) days?$/, "$1 天") : rate.transit}</small></span>
+                  <span className="price"><strong>${rate.price.toFixed(2)}</strong></span>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
       </main>
     );
   }
