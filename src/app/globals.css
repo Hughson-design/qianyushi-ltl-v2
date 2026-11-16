@@ -203,6 +203,14 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .price { text-align: right; }
 .rate-card .price { grid-column: -2; }
 .quick-quote { width: min(100% - 28px, 520px); margin-inline: auto; padding-block: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-bottom)); }
+.quick-quote-brand { margin-bottom: 10px; padding: clamp(10px, 3.5vw, 16px); gap: clamp(8px, 3vw, 14px); border-radius: 12px; background: #132b22; }
+.quick-quote-brand .brand-logo { width: clamp(38px, 13vw, 52px); height: auto; aspect-ratio: 1; }
+.quick-quote-brand > div { min-width: 0; overflow-wrap: anywhere; }
+.quick-quote-brand strong { font-size: clamp(12px, 4vw, 16px); }
+.quick-quote-brand span { max-width: none; color: #b4cdc1; font-size: clamp(8px, 2.5vw, 10px); }
+.quick-quote .smart-input-row > * { min-width: 0; }
+.quick-quote .carrier { overflow-wrap: anywhere; }
+.quick-quote .price { white-space: nowrap; }
 .quick-quote h1 { margin: 0; font-size: 20px; }
 .quick-quote .smart-input-row { grid-template-columns: minmax(0, 1fr); }
 .quick-quote .smart-input-row textarea { min-height: 130px; font-size: 16px; }
