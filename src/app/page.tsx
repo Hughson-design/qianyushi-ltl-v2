@@ -1245,7 +1245,7 @@ export default function Home() {
 
           {rates.length > 0 && (
             <section className="rates-section" id="rates">
-              <div className="rates-heading"><div><p className="eyebrow">{tx("QUOTE RESULTS")}</p><h2>{tx("Choose a rate")}</h2><p>{origin} → {destination}</p></div><span>P {priority1Count} · T {tqlCount} · W {wwexCount}{mothershipCount > 0 && ` · M ${mothershipCount}`}</span></div>
+              <div className="rates-heading"><div><p className="eyebrow">{tx("QUOTE RESULTS")}</p><h2>{tx("Choose a rate")}</h2><p>{origin} → {destination}</p></div><span>P {priority1Count} · T {tqlCount} · W {wwexCount} · M {mothershipCount}</span></div>
               <div className="rate-list">
                 {visibleRates.map((rate, index) => (
                   <button type="button" className={`rate-card ${selectedRate === index ? "selected" : ""}`} key={`${rate.provider}-${rate.carrier}-${rate.price}`} onClick={() => { setSelectedRate(index); setBookingOpen(false); }} onDoubleClick={() => { setSelectedRate(index); if (rate.provider !== "mothership") openBooking(); }}>
