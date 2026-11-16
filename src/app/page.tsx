@@ -1085,7 +1085,7 @@ export default function Home() {
       const normalized: Rate[] = data.rates.map((rate: { provider: "wwex" | "priority1" | "tql" | "mothership"; carrier: string; service: string; transitDays: number | null; price: number; providerRef: Record<string, string | number>; quoteToken: string }) => ({
         quoteToken: rate.quoteToken,
         carrier: rate.carrier,
-        service: `${rate.provider === "wwex" ? "WWEX" : rate.provider === "tql" ? "TQL" : rate.provider === "mothership" ? "Mothership Sandbox" : "Priority1"} · ${rate.service}`,
+        service: `${rate.provider === "wwex" ? "WWEX" : rate.provider === "tql" ? "TQL" : rate.provider === "mothership" ? "Mothership" : "Priority1"} · ${rate.service}`,
         transit: rate.transitDays ? `${rate.transitDays} ${rate.transitDays === 1 ? "day" : "days"}` : "Not provided",
         price: rate.price,
         provider: rate.provider,
@@ -1304,7 +1304,7 @@ export default function Home() {
                   </button>
                 ))}
               </div>
-              {mothershipSelected && <p className="quotes-empty">{language === "zh" ? "Mothership 沙盒报价仅供比较，暂未开放下单。" : "Mothership sandbox rates are available for comparison only."}</p>}
+              {mothershipSelected && <p className="quotes-empty">{language === "zh" ? "Mothership 报价仅供比较，暂未开放下单。" : "Mothership rates are available for comparison only."}</p>}
               {selectedRate !== null && !mothershipSelected && <div className="selection-bar"><div><span>{tx("Deposit after BOL")}</span><strong>${balanceAfter.toLocaleString(language === "zh" ? "zh-CN" : "en-US", { minimumFractionDigits: 2 })}</strong></div><p>{language === "zh" ? `生成 BOL 时将扣除 $${selectedPrice.toFixed(2)}。` : `$${selectedPrice.toFixed(2)} will be deducted when the BOL is generated.`}</p><button type="button" onClick={openBooking}>{tx("Continue to booking →")}</button></div>}
             </section>
           )}
