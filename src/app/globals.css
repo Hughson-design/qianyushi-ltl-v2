@@ -215,6 +215,8 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .quick-quote .smart-input-row { grid-template-columns: minmax(0, 1fr); }
 .quick-quote .smart-input-row textarea { min-height: 130px; font-size: 16px; }
 .quick-quote .smart-input-row button { min-height: 44px; }
+.quick-quote .quote-progress { width: min(100%, 260px); margin: 10px auto 0; }
+.quick-quote .quote-progress-items { justify-content: center; }
 .quick-quote .rate-card { grid-template-columns: 24px minmax(0, 1fr) auto; }
 .quick-quote .rate-card .price { grid-column: auto; }
 .quick-quote .rate-card:hover { transform: none; }
