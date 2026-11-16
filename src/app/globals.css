@@ -202,6 +202,14 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .rate-badge { padding: 5px 8px; border-radius: 10px; color: var(--green); background: var(--green-soft); font-size: 9px; font-weight: 750; }
 .price { text-align: right; }
 .rate-card .price { grid-column: -2; }
+.quick-quote { width: min(100% - 28px, 520px); margin-inline: auto; padding-block: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-bottom)); }
+.quick-quote h1 { margin: 0; font-size: 20px; }
+.quick-quote .smart-input-row { grid-template-columns: minmax(0, 1fr); }
+.quick-quote .smart-input-row textarea { min-height: 130px; font-size: 16px; }
+.quick-quote .smart-input-row button { min-height: 44px; }
+.quick-quote .rate-card { grid-template-columns: 24px minmax(0, 1fr) auto; }
+.quick-quote .rate-card .price { grid-column: auto; }
+.quick-quote .rate-card:hover { transform: none; }
 .price strong { font-family: Georgia, "Times New Roman", serif; font-size: 21px; }
 .selection-bar { margin-top: 13px; padding: 14px 16px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 22px; border-radius: 10px; color: white; background: #183a2e; }
 .selection-bar span, .selection-bar strong { display: block; }
