@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 type User = { email: string; firstName: string; lastName: string; phone: string; customer_id: string; role: string; active: boolean };
 type Props = {
@@ -14,6 +14,12 @@ export function AdminUserEditor({ id, language, customers, onClose, onSaved }: P
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const element = dialog.current;
+    element?.showModal();
+    return () => element?.close();
+  }, []);
   useEffect(() => {
     const abort = new AbortController();
     async function load() {
@@ -56,8 +62,12 @@ export function AdminUserEditor({ id, language, customers, onClose, onSaved }: P
     }
   }
 
-  return <section className="panel company-user-panel">
-    <header><h2>{copy("Edit user", "编辑用户")}</h2><button type="button" disabled={saving} onClick={onClose}>{copy("Close", "关闭")}</button></header>
+  return <dialog ref={dialog} className="admin-user-dialog" aria-labelledby="admin-user-editor-title" onCancel={(event) => {
+    event.preventDefault();
+    if (!saving) onClose();
+  }}>
+    <section className="panel company-user-panel">
+    <header><h2 id="admin-user-editor-title">{copy("Edit user", "编辑用户")}</h2><button type="button" disabled={saving} onClick={onClose}>{copy("Close", "关闭")}</button></header>
     {error && <p className="quotes-error" role="alert">{error}</p>}
     {!user && !error && <p role="status">{copy("Loading…", "加载中…")}</p>}
     {user && <form className="customer-form" onSubmit={save}>
@@ -81,5 +91,6 @@ export function AdminUserEditor({ id, language, customers, onClose, onSaved }: P
       <label>{copy("New password (optional)", "新密码（选填）")}<input type="password" autoComplete="new-password" minLength={8} maxLength={72} value={password} onChange={(e) => setPassword(e.target.value)} /></label>
       <button type="submit" disabled={saving}>{saving ? copy("Saving…", "保存中…") : copy("Save user", "保存用户")}</button>
     </form>}
-  </section>;
+    </section>
+  </dialog>;
 }

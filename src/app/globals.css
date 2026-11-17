@@ -513,6 +513,9 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 }
 .company-user-toolbar .company-add-user:hover { background: #ffc22b; }
 .company-user-panel { max-width: 520px; margin: 0 0 18px; }
+.admin-user-dialog { width: min(560px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; border: 0; border-radius: 13px; overflow-y: auto; background: white; box-shadow: 0 20px 70px #10251e40; }
+.admin-user-dialog::backdrop { background: #0c1d177a; }
+.admin-user-dialog .company-user-panel { width: 100%; max-width: none; margin: 0; border: 0; box-shadow: none; }
 .company-user-panel header { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
 .company-user-panel h2 { margin: 0; font-size: 17px; }
 .company-user-panel header button, .company-user-link {
