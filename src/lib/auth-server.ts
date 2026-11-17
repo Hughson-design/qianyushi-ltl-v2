@@ -9,7 +9,8 @@ const ACCESS_COOKIE = "ltl_access_token";
 const REFRESH_COOKIE = "ltl_refresh_token";
 export const ACTIVE_CUSTOMER_COOKIE = "ltl_active_customer";
 
-export type AppRole = "admin" | "operations" | "sales" | "customer";
+export const appRoles = ["admin", "operations", "sales", "customer_admin", "customer"] as const;
+export type AppRole = typeof appRoles[number];
 
 export type AppSession = {
   userId: string;
@@ -28,23 +29,11 @@ function publishableKey() {
   return key;
 }
 
-// Recognize a missing auth table for setup status.
-function isSchemaMissingTableError(status: number, detail: string) {
-  if (status === 404) return true;
-  try {
-    const data = JSON.parse(detail);
-    const code = typeof data?.code === "string" ? data.code : "";
-    return code === "PGRST205" || code === "42P01";
-  } catch {
-    return false;
-  }
-}
-
 export async function authSchemaStatus() {
   const response = await supabaseRequest("app_users?select=user_id&limit=1");
   if (!response.ok) {
     const detail = await response.text();
-    if (isSchemaMissingTableError(response.status, detail)) return { ready: false, hasUsers: false };
+    if (response.status === 404 || detail.includes("app_users")) return { ready: false, hasUsers: false };
     throw new Error(detail || "Unable to check authentication setup.");
   }
   const rows = await response.json();
@@ -128,7 +117,7 @@ export async function getAppSession(): Promise<AppSession | null> {
   if (!profile?.active || !profile.customer_id || homeCustomer?.active !== true) return null;
   let activeCustomer = homeCustomer;
   let customerId = profile.customer_id || null;
-  if (profile.role === "admin" || profile.role === "operations") {
+  if (profile.role === "admin") {
     const selectedId = store.get(ACTIVE_CUSTOMER_COOKIE)?.value;
     if (selectedId && /^[0-9a-f-]{36}$/i.test(selectedId)) {
       const selectedResponse = await supabaseRequest(`customers?select=id,name,active,can_self_book&id=eq.${encodeURIComponent(selectedId)}&limit=1`);
@@ -146,7 +135,7 @@ export async function getAppSession(): Promise<AppSession | null> {
     email: profile.email || authUser.email || "",
     name: profile.full_name || profile.email || "User",
     role: profile.role,
-    canSelfBook: profile.role !== "customer" || activeCustomer?.can_self_book !== false,
+    canSelfBook: !["customer", "customer_admin"].includes(profile.role) || activeCustomer?.can_self_book !== false,
   };
 }
 
@@ -159,8 +148,18 @@ export async function requireAppSession() {
 export async function requireAdminSession() {
   const result = await requireAppSession();
   if (!result.session || result.response) return result;
-  if (result.session.role !== "admin" && result.session.role !== "operations") {
+  if (result.session.role !== "admin") {
     return { session: null, response: NextResponse.json({ error: "Administrator access is required." }, { status: 403 }) };
+  }
+  return result;
+}
+
+export async function requireUserManagerSession() {
+  const result = await requireAppSession();
+  if (!result.session || result.response) return result;
+  const { role, customerId } = result.session;
+  if (role !== "admin" && (role !== "customer_admin" || !customerId)) {
+    return { session: null, response: NextResponse.json({ error: "User management access is required." }, { status: 403 }) };
   }
   return result;
 }

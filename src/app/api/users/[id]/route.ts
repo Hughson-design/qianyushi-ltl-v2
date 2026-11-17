@@ -1,20 +1,25 @@
 import { NextResponse } from "next/server";
 
-import { requireAdminSession } from "@/lib/auth-server";
+import { appRoles, customerFilter, requireAdminSession, requireUserManagerSession } from "@/lib/auth-server";
 import { responseError, supabaseConfig, supabaseRequest } from "@/lib/supabase-server";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdminSession();
+  const auth = await requireUserManagerSession();
   if (auth.response || !auth.session) return auth.response;
   const { id } = await context.params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ error: "Invalid user ID." }, { status: 400 });
   const body = await request.json();
   const fullName = String(body.fullName || "").trim();
-  const role = ["admin", "operations", "sales", "customer"].includes(body.role) ? body.role : "customer";
   const password = String(body.password || "");
+  const scoped = auth.session.role === "customer_admin";
+  if (scoped && ((body.role && body.role !== "customer") || password)) {
+    return NextResponse.json({ error: "Only a platform administrator can change roles or reset existing passwords." }, { status: 403 });
+  }
+  const role = appRoles.includes(body.role) ? body.role : "customer";
   if (!fullName) return NextResponse.json({ error: "User name is required." }, { status: 400 });
   if (password && password.length < 8) return NextResponse.json({ error: "The new password must contain at least 8 characters." }, { status: 400 });
-  const profileResponse = await supabaseRequest(`app_users?user_id=eq.${encodeURIComponent(id)}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ full_name: fullName, role, active: body.active !== false, updated_at: new Date().toISOString() }) });
+  const scope = scoped ? `${customerFilter(auth.session)}&role=eq.customer` : "";
+  const profileResponse = await supabaseRequest(`app_users?user_id=eq.${encodeURIComponent(id)}${scope}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ full_name: fullName, role, active: body.active !== false, updated_at: new Date().toISOString() }) });
   if (!profileResponse.ok) return NextResponse.json({ error: await responseError(profileResponse, "Unable to update the user.") }, { status: 502 });
   const rows = await profileResponse.json();
   if (!rows.length) return NextResponse.json({ error: "User not found." }, { status: 404 });
