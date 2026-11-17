@@ -140,7 +140,7 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .readonly-field input { color: #315244; background: #edf5f1; font-weight: 800; cursor: default; }
 .class-note { margin: 12px 0 0; color: #7d8883; font-size: 9px; line-height: 1.5; }
 .freight-line-scroll { width: 100%; overflow-x: auto; padding: 2px 0 8px; scrollbar-color: #9eb9ad #e7eeea; scrollbar-width: thin; }
-.freight-grid-v3 { min-width: 1000px; display: grid; grid-template-columns: 48px 120px 90px 55px 55px 55px 55px 90px 90px 50px 85px 110px 85px; align-items: end; gap: 5px; }
+.freight-grid-v3 { min-width: 1000px; display: grid; grid-template-columns: 48px 100px 74px 55px repeat(3, 67px) 90px 90px 50px 85px 110px 85px; align-items: end; gap: 5px; }
 .line-index { min-height: 61px; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; color: var(--green); }
 .line-index > div { height: 41px; display: flex; align-items: center; gap: 5px; }
 .line-index span { font-size: 8px; font-weight: 800; letter-spacing: .08em; }
