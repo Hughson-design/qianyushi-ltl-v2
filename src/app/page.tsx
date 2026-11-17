@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { printBol, printShippingLabel } from "./print-bol";
-import { calculateDensityClass, parseSmartQuote, SmartQuoteResult } from "@/lib/smart-quote-parser";
+import { calculateDensityClass, missingDimensionUnit, parseSmartQuote, SmartQuoteResult } from "@/lib/smart-quote-parser";
 
 type FreightItem = {
   id: number;
@@ -1031,8 +1031,14 @@ export default function Home() {
   async function getRates(event: FormEvent) {
     event.preventDefault();
     const parsed = quickQuote ? parseSmartQuote(smartText) : null;
-    const freightLineCount = smartText.split(/\r\n?|\n/).filter((line) => line.trim()).length - 2;
-    if (parsed && (parsed.missing.length || parsed.items.length !== freightLineCount)) {
+    const needsDimensionUnit = (parsed ?? smartResult)?.missing.includes(missingDimensionUnit);
+    const incompleteDimensions = (parsed?.items ?? items).some((item) => !item.length || !item.width || !item.height);
+    if (needsDimensionUnit && (parsed || incompleteDimensions)) {
+      setRates([]);
+      setQuoteMessage(language === "zh" ? "请注明尺寸单位，例如 3.25 × 1.2 × 1.3 米。" : "Specify the dimension unit, for example 3.25 × 1.2 × 1.3 m.");
+      return;
+    }
+    if (parsed?.missing.length) {
       setRates([]);
       setQuoteMessage(language === "zh" ? "请填写发货地址、收货地址，以及每件货物的尺寸和重量。" : "Enter pickup and delivery addresses, plus dimensions and weight for every freight line.");
       return;
@@ -1271,7 +1277,8 @@ export default function Home() {
                 <strong>{smartResult.missing.length ? "Recognized details were filled. Please review the missing fields." : "Autofill complete. Please review the details below."}</strong>
                 {smartResult.conversions.length > 0 && <span>Conversions: {smartResult.conversions.join("; ")}</span>}
                 {smartResult.services.length > 0 && <span>Detected services: {smartResult.services.join(", ")}</span>}
-                {smartResult.missing.length > 0 && <span>Still required: {smartResult.missing.join(", ")}</span>}
+                {smartResult.missing.includes(missingDimensionUnit) && <span>{language === "zh" ? "请注明尺寸单位（米、厘米或英寸），再点自动填充。" : "Add a dimension unit (m, cm, or in), then select Autofill again."}</span>}
+                {smartResult.missing.some((field) => field !== missingDimensionUnit) && <span>Still required: {smartResult.missing.filter((field) => field !== missingDimensionUnit).join(", ")}</span>}
               </div>
             )}
           </section>
