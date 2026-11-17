@@ -9,7 +9,7 @@ export async function GET() {
   const auth = await requireUserManagerSession();
   if (auth.response || !auth.session) return auth.response;
   const query = auth.session.role === "customer_admin"
-    ? `customers?select=id,name,active,app_users(user_id,email,full_name,role,active)&id=eq.${encodeURIComponent(auth.session.customerId ?? "")}&app_users.role=eq.customer`
+    ? `customers?select=id,name,active,app_users(user_id,email,full_name,role,active)&id=eq.${encodeURIComponent(auth.session.customerId ?? "")}`
     : "customers?select=id,name,code,active,is_internal,can_self_book,markup_percent,minimum_markup,created_at,app_users(user_id,email,full_name,role,active)&order=is_internal.desc,name.asc";
   const response = await supabaseRequest(query);
   if (!response.ok) return NextResponse.json({ error: "Unable to load customers." }, { status: 502 });
