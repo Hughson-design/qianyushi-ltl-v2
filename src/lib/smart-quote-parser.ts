@@ -26,7 +26,11 @@ type TextMatch = RegExpMatchArray & { index: number };
 
 const originMarker = /(?:(?:商业|家庭|住宅)(?:有|无)卸货平台|(?:commercial|residential)\s+(?:with|without)\s+(?:a\s+)?loading\s+dock\s*)?(?:发货人?(?:地址)?|提货(?:地址|地)?|取货(?:地址|地)?|sender(?:\s*address)?|ship\s*from|pickup(?:\s*address)?)[：:]/i;
 const destinationMarker = /(?:(?:商业|家庭|住宅)(?:有|无)卸货平台|(?:commercial|residential)\s+(?:with|without)\s+(?:a\s+)?loading\s+dock\s*)?(?:收货人?(?:地址)?|派送(?:地址|地)?|送货(?:地址|地)?|receiver(?:\s*address)?|consignee(?:\s*address)?|ship\s*to|deliver(?:y)?(?:\s*address)?)[：:]/i;
-const dimensionsPattern = /(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)\s*(cm|厘米|inches?|inch|in)?/gi;
+const dimensionsPattern = /(\d+(?:\.\d+)?)\s*[x×*＊]\s*(\d+(?:\.\d+)?)\s*[x×*＊]\s*(\d+(?:\.\d+)?)\s*(厘米|公分|公尺|英寸|米|(?:cm|meters?|metres?|m|inches|inch|in)\b|")?/i;
+const pickupAddressPrefix = /^\s*(?:发货人?地址|提货地址|取货地址)\s*[：:]?\s*/;
+const deliveryAddressPrefix = /^\s*(?:收货人?地址|派送地址|送货地址)\s*[：:]?\s*/;
+const deliveryServiceLine = /^(?:(?:住宅|家庭)(?:地址|派送|送货)?|预约(?:派送|送货)?|(?:派送|送货)(?:要求|服务)?[：:]?|(?:派送|送货)?(?:尾板|尾门)|residential(?:\s+delivery)?|delivery\s+(?:services?|requirements?)[:：]?|appointment(?:\s+delivery)?|lift\s*gate(?:\s+at\s+delivery)?|[\s,，、;；])+$/i;
+export const missingDimensionUnit = "dimension unit (m, cm, or in)";
 const weightPattern = /(\d+(?:\.\d+)?)\s*(kg|公斤|kgs?|lbs?|磅)/gi;
 const addressDescriptorPattern = /商业|家庭|住宅|有卸货平台|无卸货平台|尾门|尾板|预约|有限地点|限制地点|commercial|residential|\bhome\b|with(?:\s+a)?\s+loading\s+dock|without(?:\s+a)?\s+loading\s+dock|no\s+(?:loading\s+)?dock|loading\s+dock|lift\s*gate|liftgate|appointment|limited\s*access/gi;
 
@@ -74,22 +78,26 @@ function detectServices(originLine: string, destinationLine: string, cargoText: 
   return [...services];
 }
 
-function freightItemFromLine(line: string, conversions: string[]): SmartFreightItem | null {
-  const dimensions = line.match(new RegExp(dimensionsPattern.source, "i"));
+function freightItemFromLine(line: string, conversions: string[], missing: string[]): SmartFreightItem | null {
+  const dimensions = line.match(dimensionsPattern);
   const weight = line.match(new RegExp(weightPattern.source, "i"));
   if (!dimensions && !weight) return null;
 
-  const dimensionUnit = dimensions?.[4]?.toLowerCase() ?? "in";
-  const isCentimeters = dimensionUnit === "cm" || dimensionUnit === "厘米";
+  const dimensionUnit = dimensions?.[4]?.toLowerCase();
   const rawLength = Number(dimensions?.[1] ?? 0);
   const rawWidth = Number(dimensions?.[2] ?? 0);
   const rawHeight = Number(dimensions?.[3] ?? 0);
   const weightUnit = weight?.[2]?.toLowerCase() ?? "lb";
   const isKilograms = /kg|公斤/.test(weightUnit);
   const rawWeight = Number(weight?.[1] ?? 0);
-  const convertedLength = isCentimeters ? rawLength / 2.54 : rawLength;
-  const convertedWidth = isCentimeters ? rawWidth / 2.54 : rawWidth;
-  const convertedHeight = isCentimeters ? rawHeight / 2.54 : rawHeight;
+  const needsUnit = Boolean(dimensions && !dimensionUnit && [rawLength, rawWidth, rawHeight].some((size) => size < 10 && !Number.isInteger(size)));
+  if (needsUnit && !missing.includes(missingDimensionUnit)) missing.push(missingDimensionUnit);
+  const centimetersPerUnit = /^(?:米|公尺|m|meters?|metres?)$/.test(dimensionUnit ?? "") ? 100
+    : /^(?:cm|厘米|公分)$/.test(dimensionUnit ?? "") ? 1 : 0;
+  const inchesPerUnit = centimetersPerUnit ? centimetersPerUnit / 2.54 : 1;
+  const convertedLength = rawLength * inchesPerUnit;
+  const convertedWidth = rawWidth * inchesPerUnit;
+  const convertedHeight = rawHeight * inchesPerUnit;
   const convertedWeight = isKilograms ? rawWeight * 2.2046226218 : rawWeight;
   const pallets = line.match(/(\d+)\s*(?:托盘|托|pallets?|skids?)/i)?.[1] ?? line.match(/(?:数量|qty|quantity)[：:]?\s*(\d+)/i)?.[1] ?? "1";
   const totalWeightProvided = /总重量|total\s*weight/i.test(line);
@@ -99,16 +107,16 @@ function freightItemFromLine(line: string, conversions: string[]): SmartFreightI
   const hazmat = /危险品|hazmat|hazardous/i.test(line) && !/非危险品|不是危险品|non[-\s]?hazmat/i.test(line);
   const stackable = !/不可堆叠|不能堆叠|non[-\s]?stackable|do\s*not\s*stack/i.test(line);
 
-  if (isCentimeters && dimensions) conversions.push(`${rawLength}×${rawWidth}×${rawHeight} cm → ${rounded(convertedLength)}×${rounded(convertedWidth)}×${rounded(convertedHeight)} in`);
+  if (centimetersPerUnit) conversions.push(`${rawLength}×${rawWidth}×${rawHeight} ${centimetersPerUnit === 100 ? "m" : "cm"} → ${rounded(convertedLength)}×${rounded(convertedWidth)}×${rounded(convertedHeight)} in`);
   if (isKilograms && weight) conversions.push(`${rawWeight} kg → ${rounded(convertedWeight)} lb`);
 
   return {
     packaging: /(?:木箱|crate)/i.test(line) ? "Crate" : /(?:纸箱|carton)/i.test(line) ? "Carton" : /(?:捆|bale)/i.test(line) ? "Bale" : /(?:卷|roll)/i.test(line) ? "Roll" : /(?:散件|loose)/i.test(line) ? "Loose" : "Pallet",
     stackable,
     pallets,
-    length: rounded(convertedLength),
-    width: rounded(convertedWidth),
-    height: rounded(convertedHeight),
+    length: needsUnit ? "" : rounded(convertedLength),
+    width: needsUnit ? "" : rounded(convertedWidth),
+    height: needsUnit ? "" : rounded(convertedHeight),
     unitWeight: rounded(unitWeight),
     hazmat,
     commodity,
@@ -136,19 +144,20 @@ export function calculateDensityClass(length: number, width: number, height: num
 }
 
 export function parseSmartQuote(input: string): SmartQuoteResult {
-  const lines = input.replace(/\r\n?/g, "\n").split("\n").map((line) => line.replace(/[\t]+/g, " ").trim()).filter(Boolean);
+  const lines = input.replace(/\r\n?/g, "\n").split("\n").map((line) => line.replace(/[\t]+/g, " ").replace(/\\\s*$/, "").trim()).filter(Boolean);
   const originLine = lines[0] ?? "";
   const destinationLine = lines[1] ?? "";
-  const cargoLines = lines.slice(2);
-  const originAddress = stripAddressLine(originLine, originMarker);
-  const destinationAddress = stripAddressLine(destinationLine, destinationMarker);
+  const deliveryNotes = lines.slice(2).filter((line) => deliveryServiceLine.test(line));
+  const cargoLines = lines.slice(2).filter((line) => !deliveryServiceLine.test(line));
+  const originAddress = stripAddressLine(originLine.replace(pickupAddressPrefix, ""), originMarker);
+  const destinationAddress = stripAddressLine(destinationLine.replace(deliveryAddressPrefix, ""), destinationMarker);
   const conversions: string[] = [];
-  const items = cargoLines.map((line) => freightItemFromLine(line, conversions)).filter((item): item is SmartFreightItem => item !== null);
-
   const missing: string[] = [];
   if (!originAddress || !zipFrom(originAddress)) missing.push("pickup address and ZIP code");
   if (!destinationAddress || !zipFrom(destinationAddress)) missing.push("delivery address and ZIP code");
-  if (items.length === 0 || items.some((item) => !Number(item.length) || !Number(item.width) || !Number(item.height) || !Number(item.unitWeight))) missing.push("dimensions and weight");
+  const items = cargoLines.map((line) => freightItemFromLine(line, conversions, missing)).filter((item): item is SmartFreightItem => item !== null);
+  if (items.length === 0 || items.some((item) => item.length === "0" || item.width === "0" || item.height === "0" || !Number(item.unitWeight))) missing.push("dimensions and weight");
+  if (items.length && items.length !== cargoLines.length) missing.push("unrecognized freight or service line");
 
   return {
     originAddress,
@@ -156,7 +165,7 @@ export function parseSmartQuote(input: string): SmartQuoteResult {
     destinationAddress,
     destinationZip: zipFrom(destinationAddress),
     items,
-    services: detectServices(originLine, destinationLine, cargoLines.join(" ")),
+    services: detectServices(originLine, [destinationLine, ...deliveryNotes].join(" "), cargoLines.join(" ")),
     conversions,
     missing,
   };
