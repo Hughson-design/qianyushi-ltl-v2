@@ -1091,7 +1091,7 @@ export default function Home() {
     setQuoteMessage("");
     try {
       let services = parsed?.services ?? selectedServices;
-      if (parsed) {
+      if (parsed && !parsed.hasDeclaredDeliveryType) {
         const sameAddress = deliveryCheck?.address === parsed.destinationAddress && deliveryCheck.zip === parsed.destinationZip;
         const classification = sameAddress && deliveryCheck.classification !== "unavailable"
           ? deliveryCheck.classification : await classifyDeliveryAddress(parsed.destinationAddress, parsed.destinationZip);
@@ -1191,7 +1191,7 @@ export default function Home() {
     }
     setSelectedServices(result.services);
     invalidateRates();
-    if (!result.destinationAddress || !result.destinationZip) return;
+    if (result.hasDeclaredDeliveryType || !result.destinationAddress || !result.destinationZip) return;
 
     const requestId = deliveryCheckRequest.current;
     setCheckingDelivery(true);
@@ -1263,7 +1263,7 @@ export default function Home() {
             <textarea id="quick-quote-text" required disabled={loading} rows={5} value={smartText} placeholder={smartQuoteExample} onChange={(event) => {
               if (deliveryCheck) {
                 const updated = parseSmartQuote(event.target.value);
-                if (updated.destinationAddress !== deliveryCheck.address || updated.destinationZip !== deliveryCheck.zip) {
+                if (updated.hasDeclaredDeliveryType || updated.destinationAddress !== deliveryCheck.address || updated.destinationZip !== deliveryCheck.zip) {
                   setDeliveryCheck(null);
                   setQuickResidential(null);
                 }
