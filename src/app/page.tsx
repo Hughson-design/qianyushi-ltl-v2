@@ -1,10 +1,29 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { printBol, printShippingLabel } from "./print-bol";
 import { calculateDensityClass, missingDimensionUnit, parseSmartQuote, SmartQuoteResult } from "@/lib/smart-quote-parser";
+
+type DeliveryClassification = "residential" | "business" | "unknown" | "unavailable";
+
+async function classifyDeliveryAddress(address: string, zip: string): Promise<DeliveryClassification> {
+  if (!/\d/.test(address.replace(/\b\d{5}(?:-\d{4})?\b/g, "")) || !/^\d{5}$/.test(zip)) return "unknown";
+  try {
+    const response = await fetch("/api/locations/validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address, zip }),
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!response.ok) return "unavailable";
+    const { classification } = await response.json();
+    return classification === "residential" || classification === "business" || classification === "unknown" ? classification : "unavailable";
+  } catch {
+    return "unavailable";
+  }
+}
 
 type FreightItem = {
   id: number;
@@ -297,6 +316,11 @@ export default function Home() {
   const smartQuoteExample = "Commercial, loading dock, 13602 12th St Unit B, Chino, CA 91710\nResidential, liftgate, appointment, 650 Boulder Drive, Breinigsville, PA 18031\n1 pallet, 110×96×65cm, 177kg, commodity: Furniture\n1 crate, 120×100×180cm, 500kg, non-stackable, commodity: Electronics";
   const [smartText, setSmartText] = useState(quickQuote ? "" : smartQuoteExample);
   const [smartResult, setSmartResult] = useState<SmartQuoteResult | null>(null);
+  const [deliveryCheck, setDeliveryCheck] = useState<{ address: string; zip: string; classification: DeliveryClassification } | null>(null);
+  const [checkingDelivery, setCheckingDelivery] = useState(false);
+  const [quickResidential, setQuickResidential] = useState<boolean | null>(null);
+  const deliveryCheckRequest = useRef(0);
+  const autoResidential = useRef(false);
   const [deposit, setDeposit] = useState(0);
 
   const pickerCategory = addressBookTarget === "sender" || addressBookTarget === "route-origin" ? "sender" : "receiver";
@@ -450,8 +474,22 @@ export default function Home() {
   }
 
   function toggleService(service: string) {
+    if (service === "Residential delivery") {
+      autoResidential.current = false;
+      if (checkingDelivery) clearDeliveryCheck();
+    }
     setSelectedServices((current) => current.includes(service) ? current.filter((item) => item !== service) : [...current, service]);
     invalidateRates();
+  }
+
+  function clearDeliveryCheck() {
+    deliveryCheckRequest.current += 1;
+    setDeliveryCheck(null);
+    setCheckingDelivery(false);
+    if (autoResidential.current) {
+      autoResidential.current = false;
+      setSelectedServices((current) => current.filter((service) => service !== "Residential delivery"));
+    }
   }
 
   function openBooking() {
@@ -524,6 +562,7 @@ export default function Home() {
         setOrigin(address.zip);
         setOriginAddress(displayAddress);
       } else {
+        clearDeliveryCheck();
         setDestination(address.zip);
         setDestinationAddress(displayAddress);
       }
@@ -914,6 +953,7 @@ export default function Home() {
   }
 
   function copyQuoteForRequote(quote: SavedQuote) {
+    clearDeliveryCheck();
     setOrigin(quote.origin_zip);
     setDestination(quote.destination_zip);
     setOriginAddress(`${quote.sender.address1}${quote.sender.address2 ? `, ${quote.sender.address2}` : ""}, ${quote.sender.city}, ${quote.sender.state} ${quote.sender.zip} · Copied order`);
@@ -1030,6 +1070,7 @@ export default function Home() {
 
   async function getRates(event: FormEvent) {
     event.preventDefault();
+    if (loading || checkingDelivery) return;
     const parsed = quickQuote ? parseSmartQuote(smartText) : null;
     const needsDimensionUnit = (parsed ?? smartResult)?.missing.includes(missingDimensionUnit);
     const incompleteDimensions = (parsed?.items ?? items).some((item) => !item.length || !item.width || !item.height);
@@ -1049,6 +1090,16 @@ export default function Home() {
     setBookingOpen(false);
     setQuoteMessage("");
     try {
+      let services = parsed?.services ?? selectedServices;
+      if (parsed) {
+        const sameAddress = deliveryCheck?.address === parsed.destinationAddress && deliveryCheck.zip === parsed.destinationZip;
+        const classification = sameAddress && deliveryCheck.classification !== "unavailable"
+          ? deliveryCheck.classification : await classifyDeliveryAddress(parsed.destinationAddress, parsed.destinationZip);
+        setDeliveryCheck({ address: parsed.destinationAddress, zip: parsed.destinationZip, classification });
+        const residential = quickResidential ?? (classification === "residential" || services.includes("Residential delivery"));
+        services = services.filter((service) => service !== "Residential delivery");
+        if (residential) services.push("Residential delivery");
+      }
       const response = await fetch("/api/quotes/rates", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
@@ -1058,7 +1109,7 @@ export default function Home() {
           originAddress: parsed?.originAddress ?? originAddress,
           destinationAddress: parsed?.destinationAddress ?? destinationAddress,
           readyDate,
-          services: parsed?.services ?? selectedServices,
+          services,
           items: (parsed?.items ?? items).map((item) => ({
             ...item,
             freightClass: calculateDensityClass(Number(item.length), Number(item.width), Number(item.height), Number(item.unitWeight)),
@@ -1125,8 +1176,10 @@ export default function Home() {
     }
   }
 
-  function smartFill() {
+  async function smartFill() {
     const result = parseSmartQuote(smartText);
+    const previousCheck = deliveryCheck;
+    clearDeliveryCheck();
     setSmartResult(result);
 
     if (result.originZip) setOrigin(result.originZip);
@@ -1138,6 +1191,20 @@ export default function Home() {
     }
     setSelectedServices(result.services);
     invalidateRates();
+    if (!result.destinationAddress || !result.destinationZip) return;
+
+    const requestId = deliveryCheckRequest.current;
+    setCheckingDelivery(true);
+    const sameAddress = previousCheck?.address === result.destinationAddress && previousCheck.zip === result.destinationZip;
+    const classification = sameAddress && previousCheck.classification !== "unavailable"
+      ? previousCheck.classification : await classifyDeliveryAddress(result.destinationAddress, result.destinationZip);
+    if (requestId !== deliveryCheckRequest.current) return;
+    setCheckingDelivery(false);
+    setDeliveryCheck({ address: result.destinationAddress, zip: result.destinationZip, classification });
+    if (classification === "residential" && !result.services.includes("Residential delivery")) {
+      autoResidential.current = true;
+      setSelectedServices((current) => current.includes("Residential delivery") ? current : [...current, "Residential delivery"]);
+    }
   }
 
   if (authState !== "ready") {
@@ -1158,6 +1225,12 @@ export default function Home() {
       </main>
     );
   }
+
+  const deliveryCheckNotice = checkingDelivery
+    ? (language === "zh" ? "正在核对收货地址…" : "Checking delivery address…")
+    : deliveryCheck && (language === "zh"
+      ? { residential: "Google Maps 识别为住宅。请确认卸货条件及是否需要预约。", business: "Google Maps 识别为商业地址。请确认卸货条件及是否需要预约。", unknown: "无法确认地址类型，请核对是否为住宅。", unavailable: "地址验证暂不可用，请自行确认是否为住宅。" }[deliveryCheck.classification]
+      : { residential: "Google Maps identified a residential address. Confirm unloading equipment and appointment needs.", business: "Google Maps identified a business address. Confirm unloading equipment and appointment needs.", unknown: "Address type was unclear. Confirm whether this is a residence.", unavailable: "Address verification is unavailable. Confirm whether this is a residence." }[deliveryCheck.classification]);
 
   const quoteProgress = (loading || Object.keys(rateProgress).length > 0) ? (
     <section className="quote-progress" aria-label={language === "zh" ? "询价进度" : "Quote progress"}>
@@ -1188,6 +1261,13 @@ export default function Home() {
           <h1><label htmlFor="quick-quote-text">SMART QUOTE</label></h1>
           <div className="smart-input-row">
             <textarea id="quick-quote-text" required disabled={loading} rows={5} value={smartText} placeholder={smartQuoteExample} onChange={(event) => {
+              if (deliveryCheck) {
+                const updated = parseSmartQuote(event.target.value);
+                if (updated.destinationAddress !== deliveryCheck.address || updated.destinationZip !== deliveryCheck.zip) {
+                  setDeliveryCheck(null);
+                  setQuickResidential(null);
+                }
+              }
               setSmartText(event.target.value);
               setRateProgress({});
               setRates([]);
@@ -1195,6 +1275,13 @@ export default function Home() {
             }} />
             <button type="submit" disabled={loading || !readyDate}>{tx(loading ? "Comparing carriers…" : "Get rates")}</button>
           </div>
+          {deliveryCheckNotice && <div className="smart-result complete">
+            <span role="status">{deliveryCheckNotice}</span>
+            <label><input type="checkbox" disabled={loading}
+              checked={quickResidential ?? (deliveryCheck?.classification === "residential" || parseSmartQuote(smartText).services.includes("Residential delivery"))}
+              onChange={(event) => { setQuickResidential(event.target.checked); setRates([]); setQuoteMessage(""); }}
+            /> {tx("Residential delivery")}</label>
+          </div>}
           {quoteProgress}
         </form>
         {quoteMessage && <p className="quote-message" role="status">{quoteMessage}</p>}
@@ -1270,7 +1357,7 @@ export default function Home() {
                 onChange={(event) => setSmartText(event.target.value)}
                 placeholder={smartQuoteExample}
               />
-              <button type="button" onClick={smartFill} disabled={!smartText.trim()}><span>✦</span>{tx("Autofill")}</button>
+              <button type="button" onClick={() => void smartFill()} disabled={!smartText.trim() || loading || checkingDelivery}><span>✦</span>{tx("Autofill")}</button>
             </div>
             {smartResult && (
               <div className={`smart-result ${smartResult.missing.length ? "needs-review" : "complete"}`}>
@@ -1281,6 +1368,7 @@ export default function Home() {
                 {smartResult.missing.some((field) => field !== missingDimensionUnit) && <span>Still required: {smartResult.missing.filter((field) => field !== missingDimensionUnit).join(", ")}</span>}
               </div>
             )}
+            {deliveryCheckNotice && <div className="smart-result complete" role="status">{deliveryCheckNotice}</div>}
           </section>
 
           <form onSubmit={getRates}>
@@ -1294,7 +1382,7 @@ export default function Home() {
                 <div className="route-line"><span>→</span></div>
                 <div className="field-block">
                   <label>{tx("SHIP TO")}</label>
-                  <div className="location-field"><span className="dot destination-dot" /><div><input value={destination} onChange={(e) => { setDestination(e.target.value); invalidateRates(); }} aria-label="Destination ZIP" /><small>{destinationAddress}</small></div><button type="button" onClick={() => void openAddressBook("route-destination")}>{tx("Address book")}</button></div>
+                  <div className="location-field"><span className="dot destination-dot" /><div><input value={destination} onChange={(e) => { clearDeliveryCheck(); setDestination(e.target.value); invalidateRates(); }} aria-label="Destination ZIP" /><small>{destinationAddress}</small></div><button type="button" onClick={() => void openAddressBook("route-destination")}>{tx("Address book")}</button></div>
                 </div>
                 <div className="field-block ready-field">
                   <label htmlFor="quote-ready-date">{tx("READY DATE (PT)")}</label>
@@ -1350,7 +1438,7 @@ export default function Home() {
               <div><span className="shield">✓</span><p><strong>{tx("Your rates are private")}</strong><small>{tx("Customers only see the final selling price.")}</small></p></div>
               <div className="quote-rate-actions">
                 {quoteProgress}
-                <button className="primary-button" disabled={loading} aria-busy={loading}>{tx("Get rates")}<span>→</span></button>
+                <button className="primary-button" disabled={loading || checkingDelivery} aria-busy={loading || checkingDelivery}>{tx("Get rates")}<span>→</span></button>
               </div>
             </div>
             {quoteMessage && <p className="quote-message" role="status">{quoteMessage}</p>}
