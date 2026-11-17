@@ -881,11 +881,11 @@ export default function Home() {
     }
   }
 
-  async function updateUser(user: Customer["app_users"][number]) {
+  async function updateUser(user: Customer["app_users"][number], requestedEmail?: string) {
     setCustomersLoading(true);
     setCustomersError("");
     try {
-      const response = await fetch(`/api/users/${user.user_id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fullName: user.full_name, ...(platformAdmin ? { role: user.role } : {}), active: user.active }) });
+      const response = await fetch(`/api/users/${user.user_id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fullName: user.full_name, ...(platformAdmin ? { role: user.role } : {}), active: user.active, requestedEmail }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to update the user.");
       await showCustomers();

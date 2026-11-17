@@ -12,6 +12,11 @@ export const ACTIVE_CUSTOMER_COOKIE = "ltl_active_customer";
 export const appRoles = ["admin", "operations", "sales", "customer_admin", "customer"] as const;
 export type AppRole = typeof appRoles[number];
 
+export function normalizeLoginEmail(value: unknown) {
+  const email = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return email.length <= 254 && /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(email) ? email : null;
+}
+
 export type AppSession = {
   userId: string;
   customerId: string | null;

@@ -9,6 +9,7 @@ type ShippingAddress = {
 };
 type AccountData = {
   profile: Profile; addresses: ShippingAddress[]; defaultAddress: ShippingAddress | null; addressesAvailable: boolean;
+  email: string; requestedEmail: string | null; emailChangeAvailable: boolean;
 };
 type AccountProps = {
   language: "en" | "zh";
@@ -29,10 +30,11 @@ const roleNames: Record<string, [string, string]> = {
 export function MyAccount({ language, user, onBack, onAddressBook, onQuotes }: AccountProps) {
   const copy = (en: string, zh: string) => language === "zh" ? zh : en;
   const [data, setData] = useState<AccountData | null>(null);
-  const [edit, setEdit] = useState<"profile" | "password" | "shipping" | null>(null);
+  const [edit, setEdit] = useState<"profile" | "password" | "shipping" | "email" | null>(null);
   const [profile, setProfile] = useState<Profile>({ firstName: "", lastName: "", phone: "" });
   const [addressId, setAddressId] = useState("");
   const [passwords, setPasswords] = useState({ currentPassword: "", password: "" });
+  const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
@@ -63,6 +65,7 @@ export function MyAccount({ language, user, onBack, onAddressBook, onQuotes }: A
     if (data) {
       setProfile(data.profile);
       setAddressId(data.defaultAddress?.id || "");
+      setEmail(data.requestedEmail || "");
     }
     setPasswords({ currentPassword: "", password: "" });
     setError("");
@@ -77,7 +80,8 @@ export function MyAccount({ language, user, onBack, onAddressBook, onQuotes }: A
     setError("");
     setNotice("");
     const cleanProfile = { firstName: profile.firstName.trim(), lastName: profile.lastName.trim(), phone: profile.phone.trim() };
-    const payload = edit === "profile" ? cleanProfile : edit === "password" ? passwords : { addressId: addressId || null, customerId };
+    const payload = edit === "profile" ? cleanProfile : edit === "password" ? passwords
+      : edit === "email" ? { email: email.trim() } : { addressId: addressId || null, customerId };
     try {
       const response = await fetch("/api/account", {
         method: "PATCH",
@@ -90,7 +94,9 @@ export function MyAccount({ language, user, onBack, onAddressBook, onQuotes }: A
       if (edit === "shipping") setData({ ...data, defaultAddress: data.addresses.find((address) => address.id === addressId) ?? null });
       setPasswords({ currentPassword: "", password: "" });
       setEdit(null);
-      setNotice(copy("Changes saved.", "已保存修改。"));
+      setNotice(edit === "email"
+        ? copy("Verification requested. Follow the instructions in your confirmation email.", "已请求验证，请按确认邮件中的说明操作。")
+        : copy("Changes saved.", "已保存修改。"));
     } catch (err) {
       setError(err instanceof Error ? err.message : copy("Unable to save changes.", "无法保存修改。"));
     } finally {
@@ -126,7 +132,7 @@ export function MyAccount({ language, user, onBack, onAddressBook, onQuotes }: A
               <button type="button" disabled={!data || saving} onClick={() => openEditor("profile")}>{copy("Edit profile", "编辑资料")}</button>
             </header>
             <dl>
-              <dt>{copy("Username", "用户名")}</dt><dd>{user.email}</dd>
+              <dt>{copy("Username", "用户名")}</dt><dd>{data?.email || user.email} <button type="button" disabled={!data?.emailChangeAvailable || saving} onClick={() => openEditor("email")}>{copy("Change email", "修改登录邮箱")}</button></dd>
               <dt>{copy("Password", "密码")}</dt><dd><span aria-hidden="true">••••••••</span> <button type="button" disabled={!data || saving} onClick={() => openEditor("password")}>{copy("Change password", "修改密码")}</button></dd>
               {edit !== "profile" && <>
                 <dt>{copy("First name", "名")}</dt><dd>{data?.profile.firstName || "—"}</dd>
@@ -134,6 +140,7 @@ export function MyAccount({ language, user, onBack, onAddressBook, onQuotes }: A
                 <dt>{copy("Primary phone number", "主要联系电话")}</dt><dd>{data?.profile.phone || "—"}</dd>
               </>}
             </dl>
+            {data?.requestedEmail && edit !== "email" && <p>{copy("Requested login email", "待确认的登录邮箱")} · {data.requestedEmail}</p>}
             {edit === "profile" && <form onSubmit={save} className="account-form">
               <label>{copy("First name", "名")}<input required maxLength={80} autoComplete="given-name" value={profile.firstName} onChange={(e) => setProfile({ ...profile, firstName: e.target.value })} /></label>
               <label>{copy("Last name", "姓")}<input maxLength={80} autoComplete="family-name" value={profile.lastName} onChange={(e) => setProfile({ ...profile, lastName: e.target.value })} /></label>
@@ -143,6 +150,10 @@ export function MyAccount({ language, user, onBack, onAddressBook, onQuotes }: A
             {edit === "password" && <form onSubmit={save} className="account-form">
               <label>{copy("Current password", "当前密码")}<input required type="password" autoComplete="current-password" value={passwords.currentPassword} onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })} /></label>
               <label>{copy("New password", "新密码")}<input required minLength={8} maxLength={72} type="password" autoComplete="new-password" value={passwords.password} onChange={(e) => setPasswords({ ...passwords, password: e.target.value })} /></label>
+              {actions}
+            </form>}
+            {edit === "email" && <form onSubmit={save} className="account-form">
+              <label>{copy("New login email", "新登录邮箱")}<input required type="email" maxLength={254} autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
               {actions}
             </form>}
           </section>

@@ -1,18 +1,23 @@
 import { NextResponse } from "next/server";
-import { customerFilter, requireAppSession, supabaseOwnUser } from "@/lib/auth-server";
+import { customerFilter, normalizeLoginEmail, requireAppSession, supabaseOwnUser } from "@/lib/auth-server";
 import { supabaseRequest } from "@/lib/supabase-server";
 
 type Profile = { firstName: string; lastName: string; phone: string };
 const addressFields = "id,company,address1,address2,city,state,zip,country,phone";
+
+function emailPreference(userId: string) {
+  return supabaseRequest(`app_users?select=requested_email&user_id=eq.${encodeURIComponent(userId)}&limit=1`);
+}
 
 export async function GET() {
   const auth = await requireAppSession();
   if (auth.response || !auth.session) return auth.response;
   const { session } = auth;
   if (!session.customerId) return NextResponse.json({ error: "Select a customer workspace first." }, { status: 403 });
-  const [userResponse, addressResponse] = await Promise.all([
+  const [userResponse, addressResponse, emailResponse] = await Promise.all([
     supabaseOwnUser(session),
     supabaseRequest(`address_book?select=${addressFields}${customerFilter(session)}&or=(category.is.null,category.in.(sender,both))&order=company.asc&limit=200`),
+    emailPreference(session.userId),
   ]);
   if (!userResponse.ok) return NextResponse.json({ error: "Unable to load your profile." }, { status: 502 });
   const user = await userResponse.json();
@@ -22,6 +27,9 @@ export async function GET() {
   const addresses = addressResponse.ok ? await addressResponse.json() : [];
   const defaultAddress = addresses.find((address: { id: string }) => address.id === defaultAddressId) ?? null;
   return NextResponse.json({
+    email: user.email || session.email,
+    requestedEmail: emailResponse.ok ? (await emailResponse.json())[0]?.requested_email ?? null : null,
+    emailChangeAvailable: emailResponse.ok,
     profile: {
       firstName: typeof stored?.firstName === "string" ? stored.firstName : firstName,
       lastName: typeof stored?.lastName === "string" ? stored.lastName : lastName.join(" "),
@@ -60,6 +68,15 @@ export async function PATCH(request: Request) {
       if (!(await response.json())[0]) return NextResponse.json({ error: "Saved shipping address not found." }, { status: 404 });
     }
     update = { data: { [`ltl_shipping_${session.customerId}`]: addressId } };
+  } else if (body?.action === "email") {
+    const email = normalizeLoginEmail(body.email);
+    if (!email || email === session.email.toLowerCase()) {
+      return NextResponse.json({ error: "Enter a different, valid login email." }, { status: 400 });
+    }
+    if (!(await emailPreference(session.userId)).ok) {
+      return NextResponse.json({ error: "Login email changes are not available yet." }, { status: 503 });
+    }
+    update = { email };
   } else if (body?.action === "password") {
     if (typeof body.currentPassword !== "string" || !body.currentPassword || body.currentPassword.length > 1024 ||
       typeof body.password !== "string" || body.password.length < 8 || body.password.length > 72) {
@@ -74,7 +91,7 @@ export async function PATCH(request: Request) {
   if (!response.ok) {
     const error = body.action === "password"
       ? "Unable to change the password. Check your current password and sign in again if required."
-      : "Unable to save your account settings.";
+      : body.action === "email" ? "Unable to send email verification. Check the address and try again later." : "Unable to save your account settings.";
     return NextResponse.json({ error }, { status: response.status >= 500 ? 502 : 400 });
   }
   return NextResponse.json({ saved: true });

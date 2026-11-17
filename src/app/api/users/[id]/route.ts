@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { appRoles, customerFilter, requireAdminSession, requireUserManagerSession } from "@/lib/auth-server";
+import { appRoles, customerFilter, normalizeLoginEmail, requireAdminSession, requireUserManagerSession } from "@/lib/auth-server";
 import { responseError, supabaseConfig, supabaseRequest } from "@/lib/supabase-server";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -11,6 +11,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const body = await request.json();
   const fullName = String(body.fullName || "").trim();
   const password = String(body.password || "");
+  const requestedEmail = normalizeLoginEmail(body.requestedEmail);
+  if (body.requestedEmail !== undefined && !requestedEmail) {
+    return NextResponse.json({ error: "Enter a valid login email." }, { status: 400 });
+  }
   const scoped = auth.session.role === "customer_admin";
   if (scoped && ((body.role !== undefined && body.role !== "customer" && body.role !== "customer_admin") || password)) {
     return NextResponse.json({ error: "Only a platform administrator can change roles or reset existing passwords." }, { status: 403 });
@@ -27,6 +31,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const profile = {
     full_name: fullName,
     updated_at: new Date().toISOString(),
+    ...(requestedEmail ? { requested_email: requestedEmail } : {}),
     ...(scoped
       ? (typeof body.active === "boolean" ? { active: body.active } : {})
       : { role: appRoles.includes(body.role) ? body.role : "customer", active: body.active !== false }),

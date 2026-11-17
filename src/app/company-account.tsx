@@ -14,7 +14,7 @@ type Props = {
   createForm: ReactNode;
   onProfile: () => void;
   onQuotes: () => void;
-  onSave: (user: CompanyUser) => Promise<boolean>;
+  onSave: (user: CompanyUser, requestedEmail?: string) => Promise<boolean>;
 };
 
 export function CompanyAccount({ language, customerName, currentUserId, users, roleLabels, loading, error, createForm, onProfile, onQuotes, onSave }: Props) {
@@ -26,6 +26,8 @@ export function CompanyAccount({ language, customerName, currentUserId, users, r
   const [panel, setPanel] = useState<"add" | "view" | "edit" | null>(null);
   const [selectedUser, setSelectedUser] = useState<CompanyUser | null>(null);
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [notice, setNotice] = useState("");
   const canEdit = (user: CompanyUser) => user.role === "customer" || user.role === "customer_admin";
   const canChangeStatus = (user: CompanyUser) => canEdit(user) && user.user_id !== currentUserId;
   const needle = search.trim().toLowerCase();
@@ -41,12 +43,20 @@ export function CompanyAccount({ language, customerName, currentUserId, users, r
   function openUser(user: CompanyUser, mode: "view" | "edit") {
     setSelectedUser(user);
     setName(user.full_name);
+    setEmail(user.email);
+    setNotice("");
     setPanel(mode);
   }
 
   async function saveName(event: FormEvent) {
     event.preventDefault();
-    if (focused && canEdit(focused) && name.trim() && await onSave({ ...focused, full_name: name.trim() })) {
+    if (!focused || !canEdit(focused) || !name.trim()) return;
+    const nextEmail = email.trim().toLowerCase();
+    const requestedEmail = nextEmail !== focused.email.toLowerCase() ? nextEmail : undefined;
+    if (await onSave({ ...focused, full_name: name.trim() }, requestedEmail)) {
+      setNotice(requestedEmail
+        ? copy("Email change requested. The user can confirm it in My Account.", "已提交邮箱修改。请该用户在「我的账户」确认。")
+        : copy("Changes saved.", "已保存修改。"));
       setPanel("view");
     }
   }
@@ -77,12 +87,15 @@ export function CompanyAccount({ language, customerName, currentUserId, users, r
       </div>
 
       {error && <p className="quotes-error" role="alert">{error}</p>}
+      {notice && <p className="settings-success" role="status">{notice}</p>}
       {panel && (panel === "add" || focused) && <section className="panel company-user-panel">
         <header><h2>{panel === "add" ? copy("Add user", "添加用户") : panel === "edit" ? copy("Edit user", "编辑用户") : copy("User details", "用户详情")}</h2>
           <button type="button" onClick={() => setPanel(null)}>{copy("Close", "关闭")}</button></header>
         {panel === "add" ? createForm : focused && (panel === "edit" ? (
           <form className="customer-form" onSubmit={saveName}>
             <label>{copy("Name", "姓名")}<input required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} /></label>
+            <label>{copy("Email / Login ID", "邮箱 / 登录 ID")}<input required type="email" maxLength={254} value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+            <small>{copy("The current login email remains active until the user confirms the change.", "用户确认后，新邮箱才会成为登录账号。")}</small>
             <button type="submit" disabled={loading}>{copy("Save", "保存")}</button>
           </form>
         ) : <dl>
