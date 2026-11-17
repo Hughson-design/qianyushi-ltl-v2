@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import postalCities from "@/data/us-postal-cities.json";
 import { issueQuoteToken } from "@/lib/quote-integrity";
 
 import { getMothershipRates, mothershipRatesEnabled } from "@/lib/carriers/mothership";
@@ -25,14 +26,59 @@ type IncomingItem = {
   declaredValue?: unknown;
 };
 
+const stateAbbreviations = {
+  Alabama: "AL", Alaska: "AK", Arizona: "AZ", Arkansas: "AR", California: "CA",
+  Colorado: "CO", Connecticut: "CT", Delaware: "DE", "District of Columbia": "DC",
+  Florida: "FL", Georgia: "GA", Hawaii: "HI", Idaho: "ID", Illinois: "IL",
+  Indiana: "IN", Iowa: "IA", Kansas: "KS", Kentucky: "KY", Louisiana: "LA",
+  Maine: "ME", Maryland: "MD", Massachusetts: "MA", Michigan: "MI", Minnesota: "MN",
+  Mississippi: "MS", Missouri: "MO", Montana: "MT", Nebraska: "NE", Nevada: "NV",
+  "New Hampshire": "NH", "New Jersey": "NJ", "New Mexico": "NM", "New York": "NY",
+  "North Carolina": "NC", "North Dakota": "ND", Ohio: "OH", Oklahoma: "OK",
+  Oregon: "OR", Pennsylvania: "PA", "Rhode Island": "RI", "South Carolina": "SC",
+  "South Dakota": "SD", Tennessee: "TN", Texas: "TX", Utah: "UT", Vermont: "VT",
+  Virginia: "VA", Washington: "WA", "West Virginia": "WV", Wisconsin: "WI",
+  Wyoming: "WY", "Puerto Rico": "PR", Guam: "GU", "U.S. Virgin Islands": "VI",
+  "American Samoa": "AS", "Northern Mariana Islands": "MP",
+};
+const stateCodes = new Map(Object.entries(stateAbbreviations).flatMap(([name, code]) => [
+  [name.toLowerCase(), code] as const, [code.toLowerCase(), code] as const,
+]));
+const stateSuffix = new RegExp(`(?:^|[ ,])(${[...stateCodes.keys()]
+  .sort((a, b) => b.length - a.length).map((name) => name.replaceAll(".", "\\.")).join("|")})$`, "i");
+const postalIndex: Record<string, { state: string; cities: string[] }> = postalCities;
+
 function parseLocation(address: string, zip: string): QuoteLocation {
-  const clean = address.replace(/\s*·.*$/, "").replace(new RegExp(`\\s*${zip}\\s*$`), "").replace(/,\s*$/, "").trim();
-  const parts = clean.split(",").map((part) => part.trim()).filter(Boolean);
-  const statePart = parts.at(-1) || "";
-  const state = statePart.match(/\b[A-Z]{2}\b/i)?.[0]?.toUpperCase() || "";
-  const city = parts.length >= 2 ? parts.at(-2) || "" : "";
-  const addressLine = parts.length >= 3 ? parts.slice(0, -2).join(", ") : "N/A";
-  return { addressLine, city, state, zip };
+  const clean = address.replace(/\s*·.*$/, "").replace(/[，、]/g, ",").trim()
+    .replace(/(?:^|[\s,])(?:United States(?: of America)?|U\.?S\.?A?\.?|美国)[\s,]*$/i, "")
+    .replace(/(?:^|[\s,])(\d{5})(?:-\d{4})?[\s,]*$/, (match, postalCode) => postalCode === zip ? "" : match)
+    .replace(/[\s,]+$/, "");
+  const postal = postalIndex[zip];
+  const suffixMatch = clean.match(stateSuffix);
+  const suffixIsCity = postal?.cities.some((city) => city.toLowerCase() === suffixMatch?.[1].toLowerCase());
+  const stateMatch = suffixIsCity ? null : suffixMatch;
+  const enteredState = stateCodes.get(stateMatch?.[1].toLowerCase() ?? "");
+  if (enteredState && postal && enteredState !== postal.state) {
+    throw new Error(`ZIP code ${zip} belongs to ${postal.state}. Check the city, state, and ZIP code.`);
+  }
+
+  const streetAndCity = stateMatch ? clean.slice(0, stateMatch.index).replace(/[\s,]+$/, "") : clean;
+  const normalized = streetAndCity.toLowerCase();
+  const citySuffix = postal?.cities.filter((city) => {
+    const name = city.toLowerCase();
+    return normalized === name || normalized.endsWith(` ${name}`) || normalized.endsWith(`,${name}`);
+  }).sort((a, b) => b.length - a.length)[0];
+  const parts = streetAndCity.split(",").map((part) => part.trim()).filter(Boolean);
+  const lastPart = parts.at(-1) ?? "";
+  const hasCityPart = parts.length > 1 && !/\d/.test(lastPart);
+  const street = citySuffix ? streetAndCity.slice(0, -citySuffix.length).replace(/[\s,]+$/, "")
+    : hasCityPart ? parts.slice(0, -1).join(", ") : /^\d/.test(streetAndCity) ? streetAndCity : "";
+  return {
+    addressLine: street || "N/A",
+    city: citySuffix || postal?.cities[0] || (hasCityPart || !street ? lastPart : ""),
+    state: enteredState || postal?.state || "",
+    zip,
+  };
 }
 
 function positiveNumber(value: unknown, field: string) {
