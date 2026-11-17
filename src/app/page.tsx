@@ -1232,6 +1232,9 @@ export default function Home() {
       ? { residential: "Google Maps 识别为住宅。请确认卸货条件及是否需要预约。", business: "Google Maps 识别为商业地址。请确认卸货条件及是否需要预约。", unknown: "无法确认地址类型，请核对是否为住宅。", unavailable: "地址验证暂不可用，请自行确认是否为住宅。" }[deliveryCheck.classification]
       : { residential: "Google Maps identified a residential address. Confirm unloading equipment and appointment needs.", business: "Google Maps identified a business address. Confirm unloading equipment and appointment needs.", unknown: "Address type was unclear. Confirm whether this is a residence.", unavailable: "Address verification is unavailable. Confirm whether this is a residence." }[deliveryCheck.classification]);
 
+  const deliveryCheckTitle = language === "zh" ? "收货地址核对" : "Delivery address check";
+  const deliveryCheckClass = deliveryCheck && deliveryCheck.classification !== "business" ? "delivery-check-notice needs-review" : "delivery-check-notice";
+
   const quoteProgress = (loading || Object.keys(rateProgress).length > 0) ? (
     <section className="quote-progress" aria-label={language === "zh" ? "询价进度" : "Quote progress"}>
       <progress aria-label={language === "zh" ? "已处理的平台" : "Quote sources processed"} max={4} value={Object.values(rateProgress).filter((entry) => entry.status !== "pending").length} />
@@ -1275,8 +1278,8 @@ export default function Home() {
             }} />
             <button type="submit" disabled={loading || !readyDate}>{tx(loading ? "Comparing carriers…" : "Get rates")}</button>
           </div>
-          {deliveryCheckNotice && <div className="smart-result complete">
-            <span role="status">{deliveryCheckNotice}</span>
+          {deliveryCheckNotice && <div className={deliveryCheckClass}>
+            <span role="status"><strong>{deliveryCheckTitle}</strong> {deliveryCheckNotice}</span>
             <label><input type="checkbox" disabled={loading}
               checked={quickResidential ?? (deliveryCheck?.classification === "residential" || parseSmartQuote(smartText).services.includes("Residential delivery"))}
               onChange={(event) => { setQuickResidential(event.target.checked); setRates([]); setQuoteMessage(""); }}
@@ -1368,7 +1371,7 @@ export default function Home() {
                 {smartResult.missing.some((field) => field !== missingDimensionUnit) && <span>Still required: {smartResult.missing.filter((field) => field !== missingDimensionUnit).join(", ")}</span>}
               </div>
             )}
-            {deliveryCheckNotice && <div className="smart-result complete" role="status">{deliveryCheckNotice}</div>}
+            {deliveryCheckNotice && <div className={deliveryCheckClass} role="status"><strong>{deliveryCheckTitle}</strong><span>{deliveryCheckNotice}</span></div>}
           </section>
 
           <form onSubmit={getRates}>
