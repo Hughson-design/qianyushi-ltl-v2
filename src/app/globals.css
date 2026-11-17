@@ -88,6 +88,29 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .smart-result.complete { color: #18563e; background: #dcf1e6; }
 .smart-result.needs-review { color: #785120; background: #fff0d9; }
 .smart-result strong { width: 100%; font-size: 11px; }
+.delivery-check-notice {
+  margin-top: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  border: 1px solid #a4c8b7;
+  border-inline-start: 4px solid #176b4a;
+  border-radius: 8px;
+  color: #174c37;
+  background: #e9f5ee;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.delivery-check-notice.needs-review {
+  border-color: #e1bd83;
+  border-inline-start-color: #a86719;
+  color: #623a10;
+  background: #fff4de;
+}
+.delivery-check-notice strong { margin-inline-end: 6px; }
+.delivery-check-notice label { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
 
 .panel { margin-top: 15px; padding: 25px 27px 27px; border: 1px solid var(--line); border-radius: 13px; background: white; box-shadow: 0 4px 18px rgba(28, 48, 39, .035); }
 .section-title { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
