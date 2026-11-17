@@ -89,9 +89,29 @@ export async function PATCH(request: Request) {
 
   const response = await supabaseOwnUser(session, { method: "PUT", body: JSON.stringify(update) });
   if (!response.ok) {
+    if (body.action === "email") {
+      const detail = await response.json().catch(() => ({}));
+      const messages: Record<string, string> = {
+        email_address_not_authorized: "Supabase email delivery is restricted to project team members. A platform administrator must configure custom SMTP before customer verification emails can be sent.",
+        over_email_send_rate_limit: "The verification email limit has been reached. Wait before retrying. A platform administrator can review Supabase email rate limits.",
+        over_request_rate_limit: "Too many requests. Wait a few minutes before trying again.",
+        email_address_invalid: "Supabase rejected this email address. Enter a real, deliverable address.",
+        email_exists: "This email address is already registered. Choose a different login email.",
+        user_already_exists: "This email address is already registered. Choose a different login email.",
+        email_provider_disabled: "Email authentication is disabled in Supabase. Contact the platform administrator.",
+        reauthentication_needed: "Sign in again before changing your login email.",
+        session_expired: "Your session has expired. Sign in again.",
+      };
+      const code = typeof detail.code === "string" ? detail.code : "";
+      const error = messages[code] || (response.status >= 500
+        ? "Supabase could not send the verification email. A platform administrator must check Authentication logs and SMTP delivery settings."
+        : "Supabase rejected the email change. A platform administrator must check Authentication logs for the reason.");
+      const status = response.status === 429 ? 429 : response.status >= 500 ? 502 : 400;
+      return NextResponse.json({ error, ...(messages[code] ? { code } : {}) }, { status });
+    }
     const error = body.action === "password"
       ? "Unable to change the password. Check your current password and sign in again if required."
-      : body.action === "email" ? "Unable to send email verification. Check the address and try again later." : "Unable to save your account settings.";
+      : "Unable to save your account settings.";
     return NextResponse.json({ error }, { status: response.status >= 500 ? 502 : 400 });
   }
   return NextResponse.json({ saved: true });
