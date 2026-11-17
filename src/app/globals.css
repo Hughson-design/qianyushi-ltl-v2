@@ -553,6 +553,24 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .company-user-more button { width: 100%; padding: 8px; border: 0; border-radius: 4px; background: #fff; color: var(--ink); text-align: start; font: inherit; }
 .company-user-more button:hover { background: #eef5f3; }
 .company-users-list .company-users-empty { padding: 22px; color: var(--muted); text-align: center; }
+.admin-users-list { margin-top: 14px; }
+.admin-users-list th:first-child { width: 17%; }
+.admin-users-list th:nth-child(2) { width: 23%; }
+.admin-users-list th:nth-child(3) { width: 22%; }
+.admin-users-list th:nth-child(4) { width: 17%; }
+.admin-users-list th:nth-child(5) { width: 11%; }
+.admin-users-list th:last-child { width: 10%; }
+.admin-users-list td, .admin-users-list th { padding: 11px 10px; }
+.admin-users-list tbody tr:nth-child(even) { background: #f7faf8; }
+.admin-users-list td strong { font-size: 13px; }
+.admin-users-list .company-user-more .danger-button { color: #9b2c2c; }
+.admin-users-list .company-user-more .danger-button:hover { background: #fcebea; }
+@media (max-width: 660px) {
+  .admin-users-list tr { grid-template-columns: minmax(0, 1fr) auto; }
+  .admin-users-list td:nth-child(3) { grid-column: 1 / -1; color: var(--muted); }
+  .admin-users-list td:nth-child(6) { grid-column: 1 / -1; }
+  .admin-users-list td:nth-child(6) .company-user-actions { justify-content: flex-end; }
+}
 .company-user-pages { justify-content: flex-end; margin-top: 17px; font-size: 13px; }
 .company-user-pages button { min-width: 34px; min-height: 34px; border: 1px solid #c3d0d1; border-radius: 6px; color: #006e95; background: #fff; font-size: 18px; }
 .company-user-pages button:disabled { opacity: .4; }

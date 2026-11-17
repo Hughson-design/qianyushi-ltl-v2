@@ -285,7 +285,7 @@ export default function Home() {
   const [customersLoading, setCustomersLoading] = useState(false);
   const [customersError, setCustomersError] = useState("");
   const [customersNotice, setCustomersNotice] = useState("");
-  const [userPasswords, setUserPasswords] = useState<Record<string, string>>({});
+
   const [pendingBolQuote, setPendingBolQuote] = useState<SavedQuote | null>(null);
   const [customerForm, setCustomerForm] = useState({ name: "", code: "", markupPercent: "0", minimumMarkup: "0", canSelfBook: true, userName: "", email: "", password: "" });
   const [userForm, setUserForm] = useState({ customerId: "", fullName: "", email: "", password: "", role: "customer" });
@@ -898,36 +898,6 @@ export default function Home() {
       setCustomersError(error instanceof Error ? error.message : "Unable to update the user.");
       setCustomersLoading(false);
       return false;
-    }
-  }
-
-  async function initializePassword(user: Customer["app_users"][number]) {
-    const password = userPasswords[user.user_id] || "";
-    setCustomersError("");
-    setCustomersNotice("");
-    if (password.length < 8) {
-      setCustomersError("The temporary password must contain at least 8 characters.");
-      return;
-    }
-    setCustomersLoading(true);
-    try {
-      const response = await fetch(`/api/users/${user.user_id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName: user.full_name, role: user.role, active: user.active, password }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Unable to initialize the password.");
-      setUserPasswords((current) => {
-        const next = { ...current };
-        delete next[user.user_id];
-        return next;
-      });
-      setCustomersNotice(`Password initialized for ${user.full_name}.`);
-      await showCustomers();
-    } catch (error) {
-      setCustomersError(error instanceof Error ? error.message : "Unable to initialize the password.");
-      setCustomersLoading(false);
     }
   }
 
@@ -1612,7 +1582,32 @@ export default function Home() {
             </div>
             {platformAdmin && <section className="panel customer-directory"><div className="directory-heading"><h2>{tx("Customer workspaces")}</h2><span>{customers.length}</span></div>{customersLoading && customers.length === 0 ? <p className="quotes-empty">{language === "zh" ? "正在加载客户…" : "Loading customers…"}</p> : <div className="customer-list">{customers.map((customer) => <article className={`customer-card ${authUser?.customerId === customer.id ? "selected" : ""}`} key={customer.id}><header><div><strong>{customer.name}</strong><span>{customer.code}{customer.is_internal ? (language === "zh" ? " · 内部" : " · Internal") : ""}</span></div>{authUser?.customerId === customer.id ? <b>{language === "zh" ? "当前" : "Current"}</b> : <button type="button" onClick={() => void selectCustomer(customer)}>{language === "zh" ? "使用此客户" : "Use customer"}</button>}</header><div className="customer-edit-grid"><label>{tx("Name")}<input value={customer.name} onChange={(event) => setCustomers((current) => current.map((item) => item.id === customer.id ? { ...item, name: event.target.value } : item))} /></label><label>{language === "zh" ? "加价 %" : "Markup %"}<input type="number" min="0" step="0.01" value={customer.markup_percent} onChange={(event) => setCustomers((current) => current.map((item) => item.id === customer.id ? { ...item, markup_percent: Number(event.target.value) } : item))} /></label><label>{language === "zh" ? "最低加价 $" : "Minimum $"}<input type="number" min="0" step="0.01" value={customer.minimum_markup} onChange={(event) => setCustomers((current) => current.map((item) => item.id === customer.id ? { ...item, minimum_markup: Number(event.target.value) } : item))} /></label></div><div className="customer-card-footer"><label><input type="checkbox" checked={customer.active} onChange={(event) => setCustomers((current) => current.map((item) => item.id === customer.id ? { ...item, active: event.target.checked } : item))} />{tx("Active")}</label><label><input type="checkbox" checked={customer.can_self_book} onChange={(event) => setCustomers((current) => current.map((item) => item.id === customer.id ? { ...item, can_self_book: event.target.checked } : item))} />{tx("May generate BOL")}</label><span>{customer.app_users?.length || 0} {language === "zh" ? "位用户" : "users"}</span><button type="button" onClick={() => void updateCustomer(customer)} disabled={customersLoading}>{tx("Save")}</button>{!customer.is_internal && <button className="danger-button" type="button" onClick={() => void deleteCustomer(customer)} disabled={customersLoading}>{tx("Delete")}</button>}</div></article>)}</div>}</section>}
           {view === "customers" && platformAdmin && adminEditId && <AdminUserEditor key={adminEditId} id={adminEditId} language={language} customers={customers} onClose={() => setAdminEditId(null)} onSaved={showCustomers} />}
-          <section className="panel users-directory"><div className="directory-heading"><h2>{tx("Login users")}</h2><span>{customers.reduce((total, customer) => total + (customer.app_users?.length || 0), 0)}</span></div><div className="users-table">{customers.flatMap((customer) => (customer.app_users || []).map((user) => <div className="user-row" key={user.user_id}><div><strong>{user.full_name}</strong><button type="button" onClick={() => setAdminEditId(user.user_id)}>{language === "zh" ? "编辑全部资料" : "Edit details"}</button><small>{user.email} · {customer.name}</small></div><select value={user.role} onChange={(event) => setCustomers((current) => current.map((item) => item.id === customer.id ? { ...item, app_users: item.app_users.map((member) => member.user_id === user.user_id ? { ...member, role: event.target.value } : member) } : item))}><option value="customer">{tx("Customer")}</option><option value="sales">{tx("Sales")}</option><option value="operations">{tx("Operations")}</option><option value="customer_admin">{customerAdminLabel}</option><option value="admin">{tx("Administrator")}</option></select><label><input type="checkbox" checked={user.active} onChange={(event) => setCustomers((current) => current.map((item) => item.id === customer.id ? { ...item, app_users: item.app_users.map((member) => member.user_id === user.user_id ? { ...member, active: event.target.checked } : member) } : item))} />{tx("Active")}</label><button type="button" onClick={() => void updateUser(user)} disabled={customersLoading}>{tx("Save user")}</button><div className="password-initializer"><input type="password" minLength={8} autoComplete="new-password" aria-label={`New password for ${user.full_name}`} placeholder={tx("New password")} value={userPasswords[user.user_id] || ""} onChange={(event) => setUserPasswords((current) => ({ ...current, [user.user_id]: event.target.value }))} /><button type="button" onClick={() => void initializePassword(user)} disabled={customersLoading || (userPasswords[user.user_id] || "").length < 8}>{tx("Initialize password")}</button></div><button className="danger-button" type="button" onClick={() => void deleteUser(user)} disabled={customersLoading || user.user_id === authUser?.userId}>{tx("Delete")}</button></div>))}</div></section>
+          <section className="panel users-directory">
+            <div className="directory-heading"><h2>{tx("Login users")}</h2><span>{customers.reduce((total, customer) => total + (customer.app_users?.length || 0), 0)}</span></div>
+            <div className="company-users-list admin-users-list">
+              <table aria-label={tx("Login users")}>
+                <thead><tr>
+                  <th scope="col">{tx("Name")}</th><th scope="col">{tx("Email")}</th><th scope="col">{tx("Customer")}</th>
+                  <th scope="col">{tx("Role")}</th><th scope="col">{tx("Status")}</th><th scope="col">{tx("Action")}</th>
+                </tr></thead>
+                <tbody>{customers.flatMap((customer) => (customer.app_users || []).map((user) => <tr key={user.user_id}>
+                  <td><strong>{user.full_name}</strong></td><td>{user.email}</td><td>{customer.name}</td>
+                  <td><span className="user-role-badge" data-role={user.role}>{userRoleLabels[user.role] ?? user.role}</span></td>
+                  <td><span className="company-user-status" data-active={user.active}>{user.active ? tx("Active") : language === "zh" ? "已停用" : "Inactive"}</span></td>
+                  <td><div className="company-user-actions">
+                    <button type="button" className="company-user-link" onClick={() => setAdminEditId(user.user_id)}>{language === "zh" ? "编辑" : "Edit"}</button>
+                    {user.user_id !== authUser?.userId && <details className="company-user-more">
+                      <summary aria-label={`${language === "zh" ? "更多操作" : "More actions"} · ${user.full_name}`}>⋮</summary>
+                      <div><button type="button" className="danger-button" disabled={customersLoading} onClick={(event) => {
+                        event.currentTarget.closest("details")?.removeAttribute("open");
+                        void deleteUser(user);
+                      }}>{tx("Delete")}</button></div>
+                    </details>}
+                  </div></td>
+                </tr>))}</tbody>
+              </table>
+            </div>
+          </section>
           </div>
         </div>
 
