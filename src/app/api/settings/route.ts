@@ -17,6 +17,7 @@ const defaults = {
   wwex_enabled: true,
   priority1_enabled: true,
   tql_enabled: false,
+  mothership_enabled: true,
 };
 
 async function settingsStorageError(response: Response, fallback: string) {
@@ -59,11 +60,12 @@ export async function POST(request: Request) {
       wwex_enabled: body.wwex_enabled !== false,
       priority1_enabled: body.priority1_enabled !== false,
       tql_enabled: body.tql_enabled === true,
+      ...(typeof body.mothership_enabled === "boolean" ? { mothership_enabled: body.mothership_enabled } : {}),
       updated_at: new Date().toISOString(),
     };
     if (!record.company_name) return NextResponse.json({ error: "Company name is required." }, { status: 400 });
     if (record.default_close_time <= record.default_ready_time) return NextResponse.json({ error: "Default close time must be later than ready time." }, { status: 400 });
-    if (!record.wwex_enabled && !record.priority1_enabled && !record.tql_enabled) return NextResponse.json({ error: "Keep at least one rate provider enabled." }, { status: 400 });
+    if (!record.wwex_enabled && !record.priority1_enabled && !record.tql_enabled && record.mothership_enabled !== true) return NextResponse.json({ error: "Keep at least one rate provider enabled." }, { status: 400 });
     const save = (settings: object) => supabaseRequest("platform_settings?on_conflict=id", {
       method: "POST",
       headers: { Prefer: "resolution=merge-duplicates,return=representation" },
@@ -72,6 +74,9 @@ export async function POST(request: Request) {
     let response = await save(record);
     if (!response.ok) {
       const error = await response.clone().json().catch(() => null);
+      if (error?.code === "PGRST204" && String(error.message).includes("mothership_enabled")) {
+        return NextResponse.json({ error: "Run the Mothership settings migration in Supabase, then save again." }, { status: 503 });
+      }
       if (error?.code === "PGRST204" && String(error.message).includes("tql_enabled")) {
         if (record.tql_enabled) return NextResponse.json({ error: "Run the TQL settings migration before enabling TQL." }, { status: 503 });
         const { tql_enabled: _tql, ...legacyRecord } = record;

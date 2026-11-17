@@ -110,7 +110,7 @@ function cheapestFive(rates: NormalizedRate[]) {
 }
 
 async function pricingSettings(session: AppSession) {
-  const fallback = { markupPercent: 0, minimumMarkup: 0, wwexEnabled: true, priority1Enabled: true, tqlEnabled: false };
+  const fallback = { markupPercent: 0, minimumMarkup: 0, wwexEnabled: true, priority1Enabled: true, tqlEnabled: false, mothershipEnabled: true };
   try {
     const response = await supabaseRequest("platform_settings?select=*&id=eq.true&limit=1");
     if (!response.ok) return fallback;
@@ -127,6 +127,7 @@ async function pricingSettings(session: AppSession) {
       wwexEnabled: settings.wwex_enabled !== false,
       priority1Enabled: settings.priority1_enabled !== false,
       tqlEnabled: settings.tql_enabled === true,
+      mothershipEnabled: settings.mothership_enabled !== false,
     };
   } catch {
     return fallback;
@@ -172,7 +173,7 @@ async function quoteResponse(request: Request, emit?: (event: object) => void) {
       { id: "wwex", enabled: pricing.wwexEnabled, getRates: getWwexRates },
       { id: "priority1", enabled: pricing.priority1Enabled, getRates: getPriority1Rates },
       { id: "tql", enabled: pricing.tqlEnabled, getRates: getTqlRates },
-      { id: "mothership", enabled: mothershipRatesEnabled(), getRates: getMothershipRates },
+      { id: "mothership", enabled: pricing.mothershipEnabled && mothershipRatesEnabled(), getRates: getMothershipRates },
     ] as const;
     const providerErrors: Record<string, string> = {};
     const batches = await Promise.all(providers.map(async ({ id, enabled, getRates }) => {

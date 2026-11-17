@@ -397,7 +397,7 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .settings-section { margin-top: 5px; padding-top: 16px; border-top: 1px solid var(--line); }
 .settings-section h2 { margin: 0; color: var(--ink); font-family: Georgia, "Times New Roman", serif; font-size: 18px; text-transform: none; }
 .settings-section > p { margin: 5px 0 12px; color: var(--muted); font-size: 10px; font-weight: 500; line-height: 1.5; text-transform: none; }
-.provider-toggles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.provider-toggles { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 8px; }
 .provider-toggles label { min-height: 60px; padding: 11px 12px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 8px; }
 .provider-toggles input { width: 15px; height: 15px; margin: 0; accent-color: var(--green); }
 .provider-toggles strong, .provider-toggles small { display: block; text-transform: none; }
