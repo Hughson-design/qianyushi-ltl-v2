@@ -430,6 +430,52 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .user-row label { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 8px; }
 .user-row input { accent-color: var(--green); }
 .user-row button { height: 32px; border: 0; border-radius: 6px; color: white; background: var(--green); font-size: 8px; font-weight: 800; }
+.customer-user-management .customer-admin-column .customer-create-panel:last-child,
+.customer-user-management .users-directory { grid-row: 1; }
+.customer-user-management .users-directory { min-width: 0; }
+.customer-user-management .user-row {
+  grid-template-columns: minmax(0, 1fr) minmax(100px, auto) 65px 88px;
+  gap: 8px 12px;
+  padding: 10px 13px;
+}
+.customer-user-management .user-row:nth-child(even) { background: #f6faf8; }
+.customer-user-management .user-identity { min-width: 0; }
+.customer-user-management .user-identity strong { font-size: 14px; overflow-wrap: anywhere; }
+.customer-user-management .user-identity small { font-size: 11px; overflow-wrap: anywhere; }
+.customer-user-management .user-name-input {
+  width: 100%;
+  max-width: 230px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid #c8d7cf;
+  border-radius: 6px;
+  color: var(--ink);
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+}
+.customer-user-management .user-name-input:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+.user-role-badge, .user-status-badge {
+  justify-self: start;
+  padding: 4px 7px;
+  border-radius: 6px;
+  color: #40554b;
+  background: #edf1ef;
+  font-size: 11px;
+  font-weight: 700;
+}
+.user-role-badge[data-role="customer_admin"], .user-status-badge[data-active="true"] { color: #17553d; background: #e3f2ea; }
+.customer-user-management .user-row label, .customer-user-management .user-row button { font-size: 11px; }
+@media (max-width: 900px) {
+  .customer-user-management .customer-admin-column .customer-create-panel:last-child,
+  .customer-user-management .users-directory { grid-row: auto; }
+}
+@media (max-width: 660px) {
+  .customer-user-management .user-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .customer-user-management .user-identity { grid-column: 1 / -1; }
+  .customer-user-management .user-row button { padding-inline: 10px; }
+}
 .password-initializer { display: grid; grid-template-columns: minmax(90px, 1fr) 105px; gap: 6px; }
 .password-initializer input { width: 100%; min-width: 0; height: 32px; padding: 0 8px; border: 1px solid #ccd6d1; border-radius: 6px; outline: none; color: var(--ink); background: white; font-size: 9px; }
 .password-initializer input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(23,107,74,.08); }
