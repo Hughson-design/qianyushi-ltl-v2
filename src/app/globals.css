@@ -113,6 +113,28 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .delivery-check-notice label { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
 
 .panel { margin-top: 15px; padding: 25px 27px 27px; border: 1px solid var(--line); border-radius: 13px; background: white; box-shadow: 0 4px 18px rgba(28, 48, 39, .035); }
+.account-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.account-column { display: grid; gap: 16px; min-width: 0; }
+.account-card { margin: 0; min-width: 0; }
+.account-card header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 15px; }
+.account-card h2 { margin: 0; font-size: 20px; }
+.account-card dl { display: grid; grid-template-columns: minmax(85px, .65fr) minmax(0, 1fr); gap: 11px 14px; margin: 0; font-size: 14px; }
+.account-card dt { color: var(--muted); }
+.account-card dd { margin: 0; overflow-wrap: anywhere; }
+.account-card address, .account-card > p { margin: 0; font-size: 14px; font-style: normal; line-height: 1.6; overflow-wrap: anywhere; }
+.account-card > p { color: var(--muted); }
+.account-links, .account-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.account-card button, .account-links button { padding: 5px 8px; border: 0; border-radius: 6px; color: var(--green); background: transparent; font: inherit; font-size: 13px; font-weight: 700; }
+.account-card button:hover, .account-links button:hover { background: #e9f3ee; }
+.account-card button:disabled { opacity: .5; }
+.account-card .account-book-link { margin-top: 12px; }
+.account-form { display: grid; gap: 12px; margin-top: 16px; }
+.account-form label { display: grid; gap: 5px; font-size: 13px; font-weight: 650; }
+.account-form input, .account-form select { width: 100%; min-width: 0; min-height: 38px; padding: 7px 9px; border: 1px solid #c8d7cf; border-radius: 7px; color: var(--ink); background: white; font: inherit; }
+.account-form button[type="submit"] { padding: 8px 14px; color: white; background: var(--green); }
+@media (max-width: 750px) {
+  .account-grid { grid-template-columns: minmax(0, 1fr); }
+}
 .section-title { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
 .section-title > span { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 50%; color: white; background: var(--green); font-size: 12px; font-weight: 800; }
 .section-title h2 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 21px; }

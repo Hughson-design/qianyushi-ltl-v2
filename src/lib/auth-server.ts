@@ -55,6 +55,12 @@ export async function supabaseAuth(path: string, init?: RequestInit, accessToken
   });
 }
 
+export async function supabaseOwnUser(session: AppSession, init?: RequestInit) {
+  const token = (await cookies()).get(ACCESS_COOKIE)?.value;
+  if (!token || tokenSession(token)?.userId !== session.userId) return new Response(null, { status: 401 });
+  return supabaseAuth("user", init, token);
+}
+
 function tokenSession(accessToken: string) {
   try {
     const claims = JSON.parse(Buffer.from(accessToken.split(".")[1], "base64url").toString("utf8"));

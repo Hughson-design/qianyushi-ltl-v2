@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { MyAccount } from "./my-account";
 import { printBol, printShippingLabel } from "./print-bol";
 import { calculateDensityClass, missingDimensionUnit, parseSmartQuote, SmartQuoteResult } from "@/lib/smart-quote-parser";
 
@@ -103,7 +104,7 @@ type AddressBookEntry = Omit<BookingParty, "save"> & {
 };
 
 type AddressBookTarget = "route-origin" | "route-destination" | "sender" | "receiver";
-type View = "new" | "quotes" | "orders" | "addresses" | "deposit" | "customers" | "settings";
+type View = "new" | "quotes" | "orders" | "addresses" | "deposit" | "customers" | "settings" | "account";
 
 type AuthUser = {
   userId: string;
@@ -227,6 +228,7 @@ export default function Home() {
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [view, setView] = useState<View>("new");
+  const [accountBack, setAccountBack] = useState<View>("new");
   const [items, setItems] = useState<FreightItem[]>([initialItem]);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [rates, setRates] = useState<Rate[]>([]);
@@ -1334,6 +1336,10 @@ export default function Home() {
           <button type="button" className={`nav-item ${view === "addresses" ? "active" : ""}`} onClick={() => void showAddressBookPage()}><Icon>⌂</Icon>{tx("Address book")}</button>
           {!authUser?.legacy && (platformAdmin || customerAdmin) && <button type="button" className={`nav-item ${view === "customers" ? "active" : ""}`} onClick={() => void showCustomers()}><Icon>◎</Icon>{tx(customerAdmin ? "Login users" : "Customers")}</button>}
           <p className="nav-label second">{tx("ACCOUNT")}</p>
+          {authUser && !authUser.legacy && <button type="button" className={`nav-item ${view === "account" ? "active" : ""}`} onClick={() => {
+            if (view !== "account") setAccountBack(view);
+            setView("account");
+          }}><Icon>◎</Icon>{language === "zh" ? "我的账户" : "My Account"}</button>}
           <button type="button" className={`nav-item ${view === "deposit" ? "active" : ""}`} onClick={() => void showDeposit()}><Icon>◇</Icon>{tx("Deposit")}</button>
           {platformAdmin && <button type="button" className={`nav-item ${view === "settings" ? "active" : ""}`} onClick={() => void showSettings()}><Icon>⚙</Icon>{tx("Settings")}</button>}
         </nav>
@@ -1595,6 +1601,9 @@ export default function Home() {
           <section className="panel users-directory"><div className="directory-heading"><h2>{tx("Login users")}</h2><span>{managedUsers.reduce((total, customer) => total + (customer.app_users?.length || 0), 0)}</span></div><div className="users-table">{managedUsers.flatMap((customer) => (customer.app_users || []).map((user) => <div className="user-row" key={user.user_id}><div className="user-identity">{customerAdmin && canManageCustomerUser(user.role) ? <input className="user-name-input" aria-label={`${tx("Name")} · ${user.email}`} value={user.full_name} onChange={(event) => setCustomers((current) => current.map((item) => item.id === customer.id ? { ...item, app_users: item.app_users.map((member) => member.user_id === user.user_id ? { ...member, full_name: event.target.value } : member) } : item))} /> : <strong>{user.full_name}</strong>}<small>{user.email}{platformAdmin && ` · ${customer.name}`}</small></div>{platformAdmin ? <select value={user.role} onChange={(event) => setCustomers((current) => current.map((item) => item.id === customer.id ? { ...item, app_users: item.app_users.map((member) => member.user_id === user.user_id ? { ...member, role: event.target.value } : member) } : item))}><option value="customer">{tx("Customer")}</option><option value="sales">{tx("Sales")}</option><option value="operations">{tx("Operations")}</option><option value="customer_admin">{customerAdminLabel}</option><option value="admin">{tx("Administrator")}</option></select> : <span className="user-role-badge" data-role={user.role}>{userRoleLabels[user.role] ?? user.role}</span>}{customerAdmin && (!canManageCustomerUser(user.role) || user.user_id === authUser?.userId) ? <span className="user-status-badge" data-active={user.active}>{user.active ? tx("Active") : language === "zh" ? "已停用" : "Inactive"}</span> : <label><input type="checkbox" checked={user.active} onChange={(event) => setCustomers((current) => current.map((item) => item.id === customer.id ? { ...item, app_users: item.app_users.map((member) => member.user_id === user.user_id ? { ...member, active: event.target.checked } : member) } : item))} />{tx("Active")}</label>}{(platformAdmin || (customerAdmin && canManageCustomerUser(user.role))) && <button type="button" onClick={() => void updateUser(user)} disabled={customersLoading}>{tx("Save user")}</button>}{platformAdmin && <><div className="password-initializer"><input type="password" minLength={8} autoComplete="new-password" aria-label={`New password for ${user.full_name}`} placeholder={tx("New password")} value={userPasswords[user.user_id] || ""} onChange={(event) => setUserPasswords((current) => ({ ...current, [user.user_id]: event.target.value }))} /><button type="button" onClick={() => void initializePassword(user)} disabled={customersLoading || (userPasswords[user.user_id] || "").length < 8}>{tx("Initialize password")}</button></div><button className="danger-button" type="button" onClick={() => void deleteUser(user)} disabled={customersLoading || user.user_id === authUser?.userId}>{tx("Delete")}</button></>}</div>))}</div></section>
           </div>
         </div>
+
+        {view === "account" && authUser && <MyAccount key={`${authUser.userId}:${authUser.customerId}`} language={language} user={authUser}
+          onBack={() => setView(accountBack)} onAddressBook={() => void showAddressBookPage()} onQuotes={() => void showSavedQuotes()} />}
 
         <div className="content workspace-page" hidden={view !== "settings"}>
           <section className="page-heading"><div><p className="eyebrow">{tx("PLATFORM DEFAULTS")}</p><h1>{tx("Settings")}</h1><p>{tx("These defaults are applied when preparing new bookings.")}</p></div></section>
