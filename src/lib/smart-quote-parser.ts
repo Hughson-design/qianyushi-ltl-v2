@@ -16,6 +16,7 @@ export type SmartQuoteResult = {
   originZip: string;
   destinationAddress: string;
   destinationZip: string;
+  hasDeclaredDeliveryType: boolean;
   items: SmartFreightItem[];
   services: string[];
   conversions: string[];
@@ -29,7 +30,8 @@ const destinationMarker = /(?:(?:商业|家庭|住宅)(?:有|无)卸货平台|(?
 const dimensionsPattern = /(\d+(?:\.\d+)?)\s*[x×*＊]\s*(\d+(?:\.\d+)?)\s*[x×*＊]\s*(\d+(?:\.\d+)?)\s*(厘米|公分|公尺|英寸|米|(?:cm|meters?|metres?|m|inches|inch|in)\b|")?/i;
 const pickupAddressPrefix = /^\s*(?:发货人?地址|提货地址|取货地址)\s*[：:]?\s*/;
 const deliveryAddressPrefix = /^\s*(?:收货人?地址|派送地址|送货地址)\s*[：:]?\s*/;
-const deliveryServiceLine = /^(?:(?:住宅|家庭)(?:地址|派送|送货)?|预约(?:派送|送货)?|(?:派送|送货)(?:要求|服务)?[：:]?|(?:派送|送货)?(?:尾板|尾门)|residential(?:\s+delivery)?|delivery\s+(?:services?|requirements?)[:：]?|appointment(?:\s+delivery)?|lift\s*gate(?:\s+at\s+delivery)?|[\s,，、;；])+$/i;
+const deliveryServiceLine = /^(?:(?:商业|住宅|家庭)(?:地址|派送|送货)?|预约(?:派送|送货)?|(?:派送|送货)(?:要求|服务)?[：:]?|(?:派送|送货)?(?:尾板|尾门)|(?:commercial|residential)(?:\s+(?:address|delivery))?|delivery\s+(?:services?|requirements?)[:：]?|appointment(?:\s+delivery)?|lift\s*gate(?:\s+at\s+delivery)?|[\s,，、;；])+$/i;
+const commercialDelivery = /商业|\bcommercial\b(?=\s*(?:[,，;；]|$)|\s+(?:address|delivery|location|with|without|no)\b)/i;
 export const missingDimensionUnit = "dimension unit (m, cm, or in)";
 const weightPattern = /(\d+(?:\.\d+)?)\s*(kg|公斤|kgs?|lbs?|磅)/gi;
 const addressDescriptorPattern = /商业|家庭|住宅|有卸货平台|无卸货平台|尾门|尾板|预约|有限地点|限制地点|commercial|residential|\bhome\b|with(?:\s+a)?\s+loading\s+dock|without(?:\s+a)?\s+loading\s+dock|no\s+(?:loading\s+)?dock|loading\s+dock|lift\s*gate|liftgate|appointment|limited\s*access/gi;
@@ -148,6 +150,7 @@ export function parseSmartQuote(input: string): SmartQuoteResult {
   const originLine = lines[0] ?? "";
   const destinationLine = lines[1] ?? "";
   const deliveryNotes = lines.slice(2).filter((line) => deliveryServiceLine.test(line));
+  const deliveryText = [destinationLine, ...deliveryNotes].join(", ");
   const cargoLines = lines.slice(2).filter((line) => !deliveryServiceLine.test(line));
   const originAddress = stripAddressLine(originLine.replace(pickupAddressPrefix, ""), originMarker);
   const destinationAddress = stripAddressLine(destinationLine.replace(deliveryAddressPrefix, ""), destinationMarker);
@@ -159,13 +162,15 @@ export function parseSmartQuote(input: string): SmartQuoteResult {
   if (items.length === 0 || items.some((item) => item.length === "0" || item.width === "0" || item.height === "0" || !Number(item.unitWeight))) missing.push("dimensions and weight");
   if (items.length && items.length !== cargoLines.length) missing.push("unrecognized freight or service line");
 
+  const services = detectServices(originLine, deliveryText, cargoLines.join(" "));
   return {
     originAddress,
     originZip: zipFrom(originAddress),
     destinationAddress,
     destinationZip: zipFrom(destinationAddress),
     items,
-    services: detectServices(originLine, [destinationLine, ...deliveryNotes].join(" "), cargoLines.join(" ")),
+    hasDeclaredDeliveryType: services.includes("Residential delivery") || commercialDelivery.test(deliveryText),
+    services,
     conversions,
     missing,
   };
