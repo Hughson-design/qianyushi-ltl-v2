@@ -12,15 +12,31 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const fullName = String(body.fullName || "").trim();
   const password = String(body.password || "");
   const scoped = auth.session.role === "customer_admin";
-  if (scoped && ((body.role && body.role !== "customer") || password)) {
+  if (scoped && ((body.role !== undefined && body.role !== "customer" && body.role !== "customer_admin") || password)) {
     return NextResponse.json({ error: "Only a platform administrator can change roles or reset existing passwords." }, { status: 403 });
   }
-  const role = appRoles.includes(body.role) ? body.role : "customer";
+  if (scoped && id.toLowerCase() === auth.session.userId.toLowerCase() && body.active === false) {
+    return NextResponse.json({ error: "You cannot deactivate the account you are currently using." }, { status: 409 });
+  }
   if (!fullName) return NextResponse.json({ error: "User name is required." }, { status: 400 });
   if (password && password.length < 8) return NextResponse.json({ error: "The new password must contain at least 8 characters." }, { status: 400 });
-  const scope = scoped ? `${customerFilter(auth.session)}&role=eq.customer` : "";
-  const profileResponse = await supabaseRequest(`app_users?user_id=eq.${encodeURIComponent(id)}${scope}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ full_name: fullName, role, active: body.active !== false, updated_at: new Date().toISOString() }) });
-  if (!profileResponse.ok) return NextResponse.json({ error: await responseError(profileResponse, "Unable to update the user.") }, { status: 502 });
+
+  const scope = scoped
+    ? `${customerFilter(auth.session)}&role=${body.role ? `eq.${body.role}` : "in.(customer,customer_admin)"}`
+    : "";
+  const profile = {
+    full_name: fullName,
+    updated_at: new Date().toISOString(),
+    ...(scoped
+      ? (typeof body.active === "boolean" ? { active: body.active } : {})
+      : { role: appRoles.includes(body.role) ? body.role : "customer", active: body.active !== false }),
+  };
+  const profileResponse = await supabaseRequest(`app_users?user_id=eq.${encodeURIComponent(id)}${scope}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify(profile),
+  });
+  if (!profileResponse.ok) return NextResponse.json({ error: scoped ? "Unable to update the user." : await responseError(profileResponse, "Unable to update the user.") }, { status: 502 });
   const rows = await profileResponse.json();
   if (!rows.length) return NextResponse.json({ error: "User not found." }, { status: 404 });
   if (password) {
