@@ -50,6 +50,7 @@ const postalIndex: Record<string, { state: string; cities: string[] }> = postalC
 
 function parseLocation(address: string, zip: string): QuoteLocation {
   const clean = address.replace(/\s*·.*$/, "").replace(/[，、]/g, ",").trim()
+    .replace(/(?:^|[\s,])(?:United States(?: of America)?|U\.?S\.?A?\.?|美国)(?=[\s,]+\d{5}(?:-\d{4})?[\s,]*$)/i, " ")
     .replace(/(?:^|[\s,])(?:United States(?: of America)?|U\.?S\.?A?\.?|美国)[\s,]*$/i, "")
     .replace(/(?:^|[\s,])(\d{5})(?:-\d{4})?[\s,]*$/, (match, postalCode) => postalCode === zip ? "" : match)
     .replace(/[\s,]+$/, "");

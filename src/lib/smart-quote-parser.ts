@@ -30,7 +30,7 @@ const destinationMarker = /(?:(?:商业|家庭|住宅)(?:有|无)卸货平台|(?
 const dimensionsPattern = /(\d+(?:\.\d+)?)\s*[x×*＊]\s*(\d+(?:\.\d+)?)\s*[x×*＊]\s*(\d+(?:\.\d+)?)\s*(厘米|公分|公尺|英寸|米|(?:cm|meters?|metres?|m|inches|inch|in)\b|")?/i;
 const pickupAddressPrefix = /^\s*(?:发货人?地址|提货地址|取货地址)\s*[：:]?\s*/;
 const deliveryAddressPrefix = /^\s*(?:收货人?地址|派送地址|送货地址)\s*[：:]?\s*/;
-const deliveryServiceLine = /^(?:(?:商业|住宅|家庭)(?:地址|派送|送货)?|预约(?:派送|送货)?|(?:派送|送货)(?:要求|服务)?[：:]?|(?:派送|送货)?(?:尾板|尾门)|(?:commercial|residential)(?:\s+(?:address|delivery))?|delivery\s+(?:services?|requirements?)[:：]?|appointment(?:\s+delivery)?|lift\s*gate(?:\s+at\s+delivery)?|[\s,，、;；])+$/i;
+const deliveryServiceLine = /^(?:(?:商业|住宅|家庭)(?:地址|派送|送货)?|(?:电话)?预约(?:派送|送货)?|(?:派送|送货)(?:要求|服务)?[：:]?|(?:需(?:要)?|派送|送货)?(?:尾板|尾门)(?:车|服务)?|(?:commercial|residential)(?:\s+(?:address|delivery))?|delivery\s+(?:services?|requirements?)[:：]?|appointment(?:\s+delivery)?|lift\s*gate(?:\s+at\s+delivery)?|[\s,，、;；])+$/i;
 const commercialDelivery = /商业|\bcommercial\b(?=\s*(?:[,，;；]|$)|\s+(?:address|delivery|location|with|without|no)\b)/i;
 export const missingDimensionUnit = "dimension unit (m, cm, or in)";
 const weightPattern = /(\d+(?:\.\d+)?)\s*(kg|公斤|kgs?|lbs?|磅)/gi;
@@ -82,7 +82,8 @@ function detectServices(originLine: string, destinationLine: string, cargoText: 
 
 function freightItemFromLine(line: string, conversions: string[], missing: string[]): SmartFreightItem | null {
   const dimensions = line.match(dimensionsPattern);
-  const weight = line.match(new RegExp(weightPattern.source, "i"));
+  const trailingWeight = dimensions ? line.slice((dimensions.index ?? 0) + dimensions[0].trimEnd().length).match(/^[\s,，;；]+(\d+(?:\.\d+)?)\s*$/) : null;
+  const weight = line.match(new RegExp(weightPattern.source, "i")) ?? trailingWeight;
   if (!dimensions && !weight) return null;
 
   const dimensionUnit = dimensions?.[4]?.toLowerCase();
@@ -111,6 +112,12 @@ function freightItemFromLine(line: string, conversions: string[], missing: strin
 
   if (centimetersPerUnit) conversions.push(`${rawLength}×${rawWidth}×${rawHeight} ${centimetersPerUnit === 100 ? "m" : "cm"} → ${rounded(convertedLength)}×${rounded(convertedWidth)}×${rounded(convertedHeight)} in`);
   if (isKilograms && weight) conversions.push(`${rawWeight} kg → ${rounded(convertedWeight)} lb`);
+  if (dimensions && !dimensionUnit && !needsUnit && !conversions.includes("Dimensions without units use inches (in).")) {
+    conversions.push("Dimensions without units use inches (in).");
+  }
+  if (weight === trailingWeight && trailingWeight && !conversions.includes("Weights without units use pounds (lb).")) {
+    conversions.push("Weights without units use pounds (lb).");
+  }
 
   return {
     packaging: /(?:木箱|crate)/i.test(line) ? "Crate" : /(?:纸箱|carton)/i.test(line) ? "Carton" : /(?:捆|bale)/i.test(line) ? "Bale" : /(?:卷|roll)/i.test(line) ? "Roll" : /(?:散件|loose)/i.test(line) ? "Loose" : "Pallet",
