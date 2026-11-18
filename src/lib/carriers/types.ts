@@ -1,6 +1,7 @@
 export type QuoteLineItem = {
   packaging: string;
   pallets: number;
+  pieces?: number;
   stackable: boolean;
   length: number;
   width: number;

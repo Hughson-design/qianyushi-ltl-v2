@@ -10,12 +10,15 @@ export type ShipmentParty = {
   extension: string;
   contact: string;
   email: string;
+  deliveryStartTime?: string;
+  deliveryEndTime?: string;
 };
 
 export type ShipmentItem = {
   packaging: string;
   stackable: boolean;
   pallets: string | number;
+  pieces?: string | number;
   length: string | number;
   width: string | number;
   height: string | number;

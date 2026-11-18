@@ -7,6 +7,8 @@ type PrintParty = {
   zip: string;
   contact: string;
   phone: string;
+  deliveryStartTime?: string;
+  deliveryEndTime?: string;
 };
 
 type PrintShipment = {
@@ -21,6 +23,7 @@ type PrintShipment = {
   receiver: PrintParty;
   freight_items: Array<{
     pallets: string;
+    pieces?: string | number;
     packaging: string;
     totalWeight?: number;
     unitWeight?: string | number;
@@ -45,10 +48,11 @@ export function printBol(shipment: PrintShipment) {
     party?.address2,
     [party?.city, party?.state, party?.zip].filter(Boolean).join(" "),
     [party?.contact, party?.phone].filter(Boolean).join(" · "),
+    party?.deliveryStartTime && party?.deliveryEndTime ? `Delivery hours: ${party.deliveryStartTime}–${party.deliveryEndTime}` : "",
   ].filter(Boolean).map(escape).join("<br>");
   const items = shipment.freight_items ?? [];
   const rows = items.map((item) =>
-    `<tr><td>${escape(item.pallets)}</td><td>${escape(item.packaging)}</td><td>${escape(item.totalWeight)}</td><td>${item.hazmat ? "X" : ""}</td><td>${escape(item.commodity)}</td><td></td><td>${escape(item.freightClass)}</td></tr>`
+    `<tr><td>${escape(item.pallets)}</td><td>${escape(item.packaging)}</td><td>${escape(item.pieces ?? item.pallets)}</td><td>${escape(item.totalWeight)}</td><td>${item.hazmat ? "X" : ""}</td><td>${escape(item.commodity)}</td><td></td><td>${escape(item.freightClass)}</td></tr>`
   ).join("");
 
   preview.document.open();
@@ -105,7 +109,7 @@ export function printBol(shipment: PrintShipment) {
   <tbody><tr><td>${escape(shipment.reference)}</td><td></td></tr></tbody></table>
 </section>
 <section><h2>CARRIER INFORMATION</h2>
-  <table><thead><tr><th>Handling units</th><th>Type</th><th>Weight (lb)</th><th>H.M.</th><th class="description">Commodity description</th><th>NMFC #</th><th>Class</th></tr></thead>
+  <table><thead><tr><th>Handling units</th><th>Type</th><th>Pieces</th><th>Weight (lb)</th><th>H.M.</th><th class="description">Commodity description</th><th>NMFC #</th><th>Class</th></tr></thead>
   <tbody>${rows}</tbody></table>
 </section>
 <section class="signatures">
@@ -125,6 +129,7 @@ export function printShippingLabel(shipment: PrintShipment) {
 
   const items = shipment.freight_items ?? [];
   const units = items.reduce((total, item) => total + (Number(item.pallets) || 0), 0);
+  const pieces = items.reduce((total, item) => total + (Number(item.pieces ?? item.pallets) || 0), 0);
   const pallets = items.filter((item) => item.packaging?.toLowerCase() === "pallet").reduce((total, item) => total + (Number(item.pallets) || 0), 0);
   const weight = items.reduce((total, item) => total + (Number(item.totalWeight) || (Number(item.pallets) || 0) * (Number(item.unitWeight) || 0)), 0);
   const number = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
@@ -134,6 +139,7 @@ export function printShippingLabel(shipment: PrintShipment) {
     [party?.address1, party?.address2].filter(Boolean).join(" "),
     [party?.city, [party?.state, party?.zip].filter(Boolean).join(" ")].filter(Boolean).join(", "),
     party?.phone ? "P: " + party.phone : "",
+    party?.deliveryStartTime && party?.deliveryEndTime ? `Delivery hours: ${party.deliveryStartTime}–${party.deliveryEndTime}` : "",
   ].filter(Boolean).map((line) => "<div>" + escape(line) + "</div>").join("");
   const logo = escape(new URL("/qianvushi-logo.jpg", window.location.origin).href);
 
@@ -177,7 +183,7 @@ export function printShippingLabel(shipment: PrintShipment) {
       <div class="line pair"><div><b>Service Type</b><div>${escape(shipment.service)}</div></div><div><b>Total Weight</b><div>${weight > 0 ? number.format(weight) + " lb" : "—"}</div></div></div>
       <div class="line"><b>BOL #</b> ${escape(shipment.bol_number)}</div>
       <div class="line"><b>Customer Reference</b><div>${escape(shipment.reference)}</div></div>
-      <div class="line"><b>Total Handling Units:</b> ${units > 0 ? number.format(units) : "—"}<br><b>Total Pallet Count:</b> ${number.format(pallets)}</div>
+      <div class="line"><b>Total Pieces:</b> ${number.format(pieces)}<br><b>Total Handling Units:</b> ${units > 0 ? number.format(units) : "—"}<br><b>Total Pallet Count:</b> ${number.format(pallets)}</div>
       <div class="line"><b>Additional Details</b><div>${(shipment.services ?? []).map(escape).join(" · ")}</div></div>
     </aside>
     <div class="addresses">

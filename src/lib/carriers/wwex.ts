@@ -102,7 +102,7 @@ export async function getWwexRates(input: QuoteRequest): Promise<NormalizedRate[
               hazMatItemInfo: null,
               isHazMat: item.hazmat,
               NMFCNbr: null,
-              quantity: String(item.pallets),
+              quantity: String(item.pieces ?? item.pallets),
               weight: { value: item.totalWeight, unit: "LB" },
             }],
             weight: { unit: "LB", value: item.totalWeight },
@@ -225,10 +225,12 @@ export async function dispatchWwexShipment(quote: StoredQuote): Promise<Shipment
   }
   const token = await getToken();
   const address = (party: ShipmentParty, type: "SENDER" | "RECEIVER") => ({ address: { addressLineList: [party.address1, party.address2].filter(Boolean), locality: party.city, region: party.state, postalCode: party.zip, countryCode: "US", companyName: party.company, phone: party.phone, contactList: [contact(party, type)] } });
+  const deliveryInstructions = quote.receiver.deliveryStartTime && quote.receiver.deliveryEndTime
+    ? `Delivery hours (local time): ${quote.receiver.deliveryStartTime} - ${quote.receiver.deliveryEndTime}` : "";
   const response = await fetch(`${wwexBase()}/quoteOrderFlow`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ request: { shipmentProductTransactionId: productTransactionId, shipmentOfferId: offerId, shipment: { originAddress: address(quote.sender, "SENDER"), destinationAddress: address(quote.receiver, "RECEIVER"), shipmentReferenceList: [{ type: "Reference 1", value: quote.reference.slice(0, 35) }], pickupSpecialInstructions: "", deliverySpecialInstructions: "", handlingSpecialInstructions: "" }, isSelfScheduled: false, pickupDate: `${quote.ready_date} ${quote.pickup_ready_time}:00`, closeTime: `${quote.pickup_close_time}:00`, readyTime: `${quote.pickup_ready_time}:00` } }),
+    body: JSON.stringify({ request: { shipmentProductTransactionId: productTransactionId, shipmentOfferId: offerId, shipment: { originAddress: address(quote.sender, "SENDER"), destinationAddress: address(quote.receiver, "RECEIVER"), shipmentReferenceList: [{ type: "Reference 1", value: quote.reference.slice(0, 35) }], pickupSpecialInstructions: "", deliverySpecialInstructions: deliveryInstructions, handlingSpecialInstructions: "" }, isSelfScheduled: false, pickupDate: `${quote.ready_date} ${quote.pickup_ready_time}:00`, closeTime: `${quote.pickup_close_time}:00`, readyTime: `${quote.pickup_ready_time}:00` } }),
     cache: "no-store",
   });
   const data = await response.json();

@@ -191,7 +191,7 @@ export async function dispatchTqlShipment(quote: StoredQuote): Promise<ShipmentB
         puNumber: quote.reference.slice(0, 300),
       },
       deliveryDetails: {
-        ...partyDetails(quote.receiver, "8:00 AM", "5:00 PM"),
+        ...partyDetails(quote.receiver, twelveHourTime(quote.receiver.deliveryStartTime || "08:00"), twelveHourTime(quote.receiver.deliveryEndTime || "17:00")),
         deliveryPO: quote.reference.slice(0, 1000),
       },
     }),

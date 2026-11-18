@@ -2,6 +2,7 @@ export type SmartFreightItem = {
   packaging: string;
   stackable: boolean;
   pallets: string;
+  pieces: string;
   length: string;
   width: string;
   height: string;
@@ -123,6 +124,7 @@ function freightItemFromLine(line: string, conversions: string[], missing: strin
     packaging: /(?:木箱|crate)/i.test(line) ? "Crate" : /(?:纸箱|carton)/i.test(line) ? "Carton" : /(?:捆|bale)/i.test(line) ? "Bale" : /(?:卷|roll)/i.test(line) ? "Roll" : /(?:散件|loose)/i.test(line) ? "Loose" : "Pallet",
     stackable,
     pallets,
+    pieces: line.match(/(\d+)\s*(?:件|pieces?\b|pcs\b)/i)?.[1] ?? pallets,
     length: needsUnit ? "" : rounded(convertedLength),
     width: needsUnit ? "" : rounded(convertedWidth),
     height: needsUnit ? "" : rounded(convertedHeight),

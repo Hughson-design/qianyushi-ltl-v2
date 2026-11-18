@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { formatPhoneNumber } from "@/lib/phone";
 
 type Profile = { firstName: string; lastName: string; phone: string };
 type ShippingAddress = {
@@ -144,7 +145,7 @@ export function MyAccount({ language, user, onBack, onAddressBook, onQuotes }: A
             {edit === "profile" && <form onSubmit={save} className="account-form">
               <label>{copy("First name", "名")}<input required maxLength={80} autoComplete="given-name" value={profile.firstName} onChange={(e) => setProfile({ ...profile, firstName: e.target.value })} /></label>
               <label>{copy("Last name", "姓")}<input maxLength={80} autoComplete="family-name" value={profile.lastName} onChange={(e) => setProfile({ ...profile, lastName: e.target.value })} /></label>
-              <label>{copy("Primary phone number", "主要联系电话")}<input type="tel" maxLength={40} autoComplete="tel" value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} /></label>
+              <label>{copy("Primary phone number", "主要联系电话")}<input type="tel" maxLength={40} autoComplete="tel" value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} onBlur={(e) => setProfile({ ...profile, phone: formatPhoneNumber(e.target.value) })} /></label>
               {actions}
             </form>}
             {edit === "password" && <form onSubmit={save} className="account-form">

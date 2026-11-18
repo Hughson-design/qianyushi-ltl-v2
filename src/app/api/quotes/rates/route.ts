@@ -15,6 +15,7 @@ export const runtime = "nodejs";
 type IncomingItem = {
   packaging?: unknown;
   pallets?: unknown;
+  pieces?: unknown;
   stackable?: unknown;
   length?: unknown;
   width?: unknown;
@@ -91,9 +92,12 @@ function positiveNumber(value: unknown, field: string) {
 function normalizeItem(item: IncomingItem, index: number): QuoteLineItem {
   const pallets = positiveNumber(item.pallets, `Line ${index + 1} pallets`);
   const unitWeight = positiveNumber(item.unitWeight, `Line ${index + 1} unit weight`);
+  const pieces = positiveNumber(item.pieces ?? pallets, `Line ${index + 1} pieces`);
+  if (!Number.isSafeInteger(pieces)) throw new Error(`Line ${index + 1} pieces must be a whole number.`);
   return {
     packaging: String(item.packaging || "Pallet"),
     pallets,
+    pieces,
     stackable: item.stackable !== false,
     length: positiveNumber(item.length, `Line ${index + 1} length`),
     width: positiveNumber(item.width, `Line ${index + 1} width`),

@@ -3,6 +3,7 @@ import { readQuoteToken, shipmentProof } from "@/lib/quote-integrity";
 
 import { supabaseRequest } from "@/lib/supabase-server";
 import { customerFilter, requireAppSession } from "@/lib/auth-server";
+import { formatPhoneNumber } from "@/lib/phone";
 
 export const runtime = "nodejs";
 
@@ -36,6 +37,12 @@ export async function POST(request: Request) {
     const offer = readQuoteToken(body?.rate?.quoteToken, customerId);
     if (!offer) return NextResponse.json({ error: "Get fresh rates before saving this quote." }, { status: 400 });
     const { rate, shipment } = offer;
+    const deliveryStartTime = body.receiver?.deliveryStartTime ?? "08:00";
+    const deliveryEndTime = body.receiver?.deliveryEndTime ?? "17:00";
+    const validTime = (value: unknown) => typeof value === "string" && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
+    if (!validTime(deliveryStartTime) || !validTime(deliveryEndTime) || deliveryEndTime <= deliveryStartTime) {
+      return NextResponse.json({ error: "Delivery end time must be later than delivery start time." }, { status: 400 });
+    }
     if (rate.provider === "mothership") return NextResponse.json({ error: "Mothership rates are for comparison only." }, { status: 409 });
     if (body.sender?.zip !== shipment.originZip || body.receiver?.zip !== shipment.destinationZip || body.readyDate !== shipment.readyDate) {
       return NextResponse.json({ error: "The route or ready date changed. Get fresh rates before saving." }, { status: 400 });
@@ -63,8 +70,8 @@ export async function POST(request: Request) {
       provider_ref: { ...rate.providerRef, shipmentProof: shipmentProof(id, customerId) },
       freight_items: shipment.items,
       services: shipment.services,
-      sender: body.sender,
-      receiver: body.receiver,
+      sender: { ...body.sender, phone: formatPhoneNumber(String(body.sender.phone || "")) },
+      receiver: { ...body.receiver, phone: formatPhoneNumber(String(body.receiver.phone || "")), deliveryStartTime, deliveryEndTime },
       skip_address_verification: Boolean(body.skipAddressVerification),
       pickup_ready_time: body.pickupReadyTime || "09:00",
       pickup_close_time: body.pickupCloseTime || "16:00",
