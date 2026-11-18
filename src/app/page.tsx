@@ -285,7 +285,6 @@ export default function Home() {
   const [customersLoading, setCustomersLoading] = useState(false);
   const [customersError, setCustomersError] = useState("");
   const [customersNotice, setCustomersNotice] = useState("");
-
   const [pendingBolQuote, setPendingBolQuote] = useState<SavedQuote | null>(null);
   const [customerForm, setCustomerForm] = useState({ name: "", code: "", markupPercent: "0", minimumMarkup: "0", canSelfBook: true, userName: "", email: "", password: "" });
   const [userForm, setUserForm] = useState({ customerId: "", fullName: "", email: "", password: "", role: "customer" });
@@ -1050,15 +1049,35 @@ export default function Home() {
   async function getRates(event: FormEvent) {
     event.preventDefault();
     if (loading || checkingDelivery) return;
+    setLoading(true);
+    if (smartText.trim()) {
+      try {
+        const history = await fetch("/api/quote-inputs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: smartText, source: quickQuote ? "mobile" : "desktop" }),
+        });
+        if (!history.ok) {
+          const result = await history.json();
+          throw new Error(result.error || "Unable to save SMART QUOTE history.");
+        }
+      } catch (error) {
+        setLoading(false);
+        setQuoteMessage(error instanceof Error ? error.message : "Unable to save SMART QUOTE history.");
+        return;
+      }
+    }
     const parsed = quickQuote ? parseSmartQuote(smartText) : null;
     const needsDimensionUnit = (parsed ?? smartResult)?.missing.includes(missingDimensionUnit);
     const incompleteDimensions = (parsed?.items ?? items).some((item) => !item.length || !item.width || !item.height);
     if (needsDimensionUnit && (parsed || incompleteDimensions)) {
+      setLoading(false);
       setRates([]);
       setQuoteMessage(language === "zh" ? "请注明尺寸单位，例如 3.25 × 1.2 × 1.3 米。" : "Specify the dimension unit, for example 3.25 × 1.2 × 1.3 m.");
       return;
     }
     if (parsed?.missing.length) {
+      setLoading(false);
       setRates([]);
       setQuoteMessage(language === "zh" ? "请填写发货地址、收货地址，以及每件货物的尺寸和重量。" : "Enter pickup and delivery addresses, plus dimensions and weight for every freight line.");
       return;
@@ -1615,6 +1634,12 @@ export default function Home() {
           onBack={() => setView(accountBack)} onAddressBook={() => void showAddressBookPage()} onQuotes={() => void showSavedQuotes()} />}
 
         <div className="content workspace-page" hidden={view !== "settings"}>
+          {platformAdmin && <section className="panel account-card">
+            <header><h2>{language === "zh" ? "SMART QUOTE 原文记录" : "SMART QUOTE input history"}</h2>
+              <a href="/api/quote-inputs" download="smart-quote-history.txt">{language === "zh" ? "下载文本文件" : "Download text file"}</a>
+            </header>
+            <p>{language === "zh" ? "汇总所有客户点击 Get rates 时提交的原文、序号和太平洋时间。" : "All customers’ submitted text, sequence numbers, and Pacific timestamps."}</p>
+          </section>}
           <section className="page-heading"><div><p className="eyebrow">{tx("PLATFORM DEFAULTS")}</p><h1>{tx("Settings")}</h1><p>{tx("These defaults are applied when preparing new bookings.")}</p></div></section>
           <section className="panel settings-panel">{settingsError && <p className="quotes-error" role="alert">{settingsError}</p>}{settingsLoading && !settings.company_name ? <p className="quotes-empty">{language === "zh" ? "正在加载设置…" : "Loading settings…"}</p> : <form onSubmit={saveSettings} className="settings-form"><label>{tx("Company name")}<input required value={settings.company_name} onChange={(event) => setSettings((current) => ({ ...current, company_name: event.target.value }))} /></label><div className="settings-two"><label>{tx("Default contact")}<input value={settings.contact_name} onChange={(event) => setSettings((current) => ({ ...current, contact_name: event.target.value }))} /></label><label>{tx("Phone")}<input value={settings.phone} onChange={(event) => setSettings((current) => ({ ...current, phone: event.target.value }))} /></label></div><label>{tx("Email")}<input type="email" value={settings.email} onChange={(event) => setSettings((current) => ({ ...current, email: event.target.value }))} /></label><div className="settings-two"><label>{tx("Default ready time")}<input type="time" value={settings.default_ready_time} onChange={(event) => setSettings((current) => ({ ...current, default_ready_time: event.target.value }))} /></label><label>{tx("Default close time")}<input type="time" value={settings.default_close_time} onChange={(event) => setSettings((current) => ({ ...current, default_close_time: event.target.value }))} /></label></div><div className="settings-section"><h2>{tx("Customer pricing")}</h2><p>{language === "zh" ? "显示价格为承运商成本加上百分比加价或最低加价中较高的一项。" : "The displayed rate is carrier cost plus the greater of percentage markup or minimum markup."}</p><div className="settings-two"><label>{tx("Markup percent")}<input type="number" min="0" step="0.01" value={settings.markup_percent} onChange={(event) => setSettings((current) => ({ ...current, markup_percent: Number(event.target.value) }))} /></label><label>{tx("Minimum markup (USD)")}<input type="number" min="0" step="0.01" value={settings.minimum_markup} onChange={(event) => setSettings((current) => ({ ...current, minimum_markup: Number(event.target.value) }))} /></label></div></div><div className="settings-section"><h2>{tx("Rate providers")}</h2><div className="provider-toggles"><label><input type="checkbox" checked={settings.wwex_enabled} onChange={(event) => setSettings((current) => ({ ...current, wwex_enabled: event.target.checked }))} /><span><strong>WWEX</strong><small>{language === "zh" ? "包含 WWEX 报价" : "Include WWEX rates"}</small></span></label><label><input type="checkbox" checked={settings.priority1_enabled} onChange={(event) => setSettings((current) => ({ ...current, priority1_enabled: event.target.checked }))} /><span><strong>Priority1</strong><small>{language === "zh" ? "包含 Priority1 报价" : "Include Priority1 rates"}</small></span></label><label><input type="checkbox" checked={settings.tql_enabled} onChange={(event) => setSettings((current) => ({ ...current, tql_enabled: event.target.checked }))} /><span><strong>TQL</strong><small>{language === "zh" ? "包含 TQL 报价" : "Include TQL rates"}</small></span></label><label><input type="checkbox" checked={settings.mothership_enabled !== false} onChange={(event) => setSettings((current) => ({ ...current, mothership_enabled: event.target.checked }))} /><span><strong>Mothership</strong><small>{language === "zh" ? "包含 Mothership 报价" : "Include Mothership rates"}</small></span></label></div></div><button type="submit" disabled={settingsLoading || (!settings.wwex_enabled && !settings.priority1_enabled && !settings.tql_enabled && settings.mothership_enabled === false)}>{settingsLoading ? tx("Please wait…") : tx("Save settings")}</button>{!settings.wwex_enabled && !settings.priority1_enabled && !settings.tql_enabled && settings.mothership_enabled === false && <small className="settings-warning">{language === "zh" ? "请至少启用一个报价渠道。" : "Keep at least one rate provider enabled."}</small>}</form>}{settingsMessage && <p className="settings-success" role="status">{settingsMessage}</p>}</section>
         </div>
