@@ -119,7 +119,7 @@ export function CompanyAccount({ language, customerName, currentUserId, users, r
           </tr></thead>
           <tbody>
             {pageUsers.map((user) => <tr key={user.user_id}>
-              <td><button className="company-user-link" type="button" onClick={() => openUser(user, "view")}>{user.full_name}</button></td>
+              <td><div className="user-name-with-current"><button className="company-user-link" type="button" onClick={() => openUser(user, "view")}>{user.full_name}</button>{user.user_id === currentUserId && <span className="current-user-badge">{copy("Current", "当前用户")}</span>}</div></td>
               <td>{user.email}</td>
               <td>{roleLabels[user.role] ?? user.role}</td>
               <td><span className="company-user-status" data-active={user.active}>{statusLabel(user)}</span></td>

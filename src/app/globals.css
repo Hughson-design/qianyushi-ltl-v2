@@ -435,6 +435,8 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .workspace-card-actions > button { padding: 7px 10px; border: 1px solid #b7cfbf; border-radius: 7px; background: #edf6f0; color: #17553d; font-size: 12px; font-weight: 700; }
 .workspace-card-actions > button:disabled { opacity: .45; }
 .workspace-current { color: #17553d; font-weight: 750; }
+.user-name-with-current { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px; }
+.current-user-badge { display: inline-flex; flex: none; padding: 3px 7px; border-radius: 5px; color: #17553d; background: #e3f2ea; font-size: 10px; font-weight: 750; line-height: 1.4; white-space: nowrap; }
 .workspace-editor { margin-top: 16px; padding: 16px; border: 1px solid #b7cfbf; border-radius: 9px; background: #f5f9f6; }
 .workspace-editor header { display: flex; justify-content: space-between; align-items: center; }
 .workspace-editor h3 { margin: 0; font-size: 16px; }

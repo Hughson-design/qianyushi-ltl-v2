@@ -1628,7 +1628,7 @@ export default function Home() {
                   <th scope="col">{tx("Role")}</th><th scope="col">{tx("Status")}</th><th scope="col">{tx("Action")}</th>
                 </tr></thead>
                 <tbody>{customers.flatMap((customer) => (customer.app_users || []).map((user) => <tr key={user.user_id}>
-                  <td><strong>{user.full_name}</strong></td><td>{user.email}</td><td>{customer.name}</td>
+                  <td><div className="user-name-with-current"><strong>{user.full_name}</strong>{user.user_id === authUser?.userId && <span className="current-user-badge">{language === "zh" ? "当前用户" : "Current"}</span>}</div></td><td>{user.email}</td><td>{customer.name}</td>
                   <td><span className="user-role-badge" data-role={user.role}>{userRoleLabels[user.role] ?? user.role}</span></td>
                   <td><span className="company-user-status" data-active={user.active}>{user.active ? tx("Active") : language === "zh" ? "已停用" : "Inactive"}</span></td>
                   <td><div className="company-user-actions">
