@@ -203,7 +203,7 @@ const services = ["Liftgate at pickup", "Liftgate at delivery", "Residential pic
 
 const chineseTranslations: Record<string, string> = {
   "WORKSPACE": "工作台", "ACCOUNT": "账户", "New quote": "新建报价", "Quotes": "报价", "Orders": "订单", "Address book": "地址簿", "Customers": "客户", "Deposit": "押金", "Settings": "设置", "Sign out": "退出登录",
-  "CREATE SHIPMENT": "创建运输", "Get an LTL quote": "获取 LTL 报价", "Enter the shipment details once. We’ll compare your available carriers.": "填写一次运输资料，系统将比较可用承运商的价格。", "Available deposit": "可用押金", "View activity →": "查看明细 →",
+  "CREATE SHIPMENT": "创建运输", "Get an LTL quote": "获取 LTL 报价", "Available deposit": "可用押金", "View activity →": "查看明细 →",
   "SMART QUOTE": "智能报价", "Paste shipment details to autofill": "粘贴货物资料并自动填写", "Line 1: sender. Line 2: receiver. Line 3 and after: one freight item per line. Commercial, residential, liftgate, and appointment keywords are recognized automatically.": "第一行填写发货地址，第二行填写收货地址，第三行起每行填写一项货物。系统可自动识别商业、住宅、尾门和预约等关键词。", "Autofill": "帮我填写",
   "Route": "路线", "Where is the freight moving?": "货物从哪里运到哪里？", "SHIP FROM": "发货地", "SHIP TO": "收货地", "Address category": "地址分类", "Choose at least one address category.": "请至少勾选一个地址分类。", "Shipper and consignee": "发货人及收货人", "Uncategorized": "未分类", "READY DATE (PT)": "发货日期（美国太平洋时间）",
   "Freight details": "货物详情", "All dimensions use inches and all weights use pounds.": "尺寸统一使用英寸，重量统一使用磅。", "LINE": "货物行", "Remove": "删除", "Packaging": "包装类型", "Select": "请选择", "Carton": "硬纸箱", "Crate": "木箱", "Bale": "捆包", "Roll": "卷", "Pallet": "托盘", "Loose": "未打托", "Stackable": "可堆叠", "Yes": "是", "No": "否", "Pallets": "托数", "Length": "长", "Width": "宽", "Height": "高", "Unit weight": "单托重量", "Total weight": "总重量", "Hazmat": "危险品", "Commodity": "英文品名", "Declared value": "货值", "Add another handling unit": "增加一项货物",
@@ -1358,7 +1358,7 @@ export default function Home() {
 
         <div className="content" id="quote" hidden={view !== "new"}>
           <section className="page-heading">
-            <div><p className="eyebrow">{tx("CREATE SHIPMENT")}</p><h1>{tx("Get an LTL quote")}</h1><p>{tx("Enter the shipment details once. We’ll compare your available carriers.")}</p></div>
+            <div><p className="eyebrow">{tx("CREATE SHIPMENT")}</p><h1>{tx("Get an LTL quote")}</h1></div>
             <div className="deposit-card" id="deposit">
               <div className="deposit-icon">$</div>
               <div><span>{tx("Available deposit")}</span><strong>${deposit.toLocaleString(language === "zh" ? "zh-CN" : "en-US", { minimumFractionDigits: 2 })}</strong></div>
