@@ -76,7 +76,7 @@ export function AdminUserEditor({ id, language, customers, onClose, onSaved }: P
       <label>{copy("Last name", "姓")}<input maxLength={80} value={user.lastName} onChange={(e) => setUser({ ...user, lastName: e.target.value })} /></label>
       <label>{copy("Email / Login ID", "邮箱 / 登录 ID")}<input required type="email" maxLength={254} value={user.email} onChange={(e) => setUser({ ...user, email: e.target.value })} /></label>
       <small>{copy("Saving applies the login email immediately. Confirm that the address belongs to this user.", "保存后登录邮箱立即生效，请确认邮箱属于此用户。")}</small>
-      <label>{copy("Phone", "电话")}<input type="tel" maxLength={40} value={user.phone} onChange={(e) => setUser({ ...user, phone: e.target.value })} onBlur={(e) => setUser({ ...user, phone: formatPhoneNumber(e.target.value) })} /></label>
+      <label>{copy("Phone", "电话")}<input type="tel" maxLength={40} value={user.phone} onChange={(e) => setUser({ ...user, phone: formatPhoneNumber(e.target.value) })} onBlur={(e) => setUser({ ...user, phone: formatPhoneNumber(e.target.value) })} /></label>
       <label>{copy("Customer", "所属客户")}<select required value={user.customer_id} onChange={(e) => setUser({ ...user, customer_id: e.target.value })}>
         {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
       </select></label>
