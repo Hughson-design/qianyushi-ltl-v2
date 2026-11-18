@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { CompanyAccount } from "./company-account";
 import { MyAccount } from "./my-account";
+import { QuoteInputHistory } from "./quote-input-history";
 import { AdminUserEditor } from "./admin-user-editor";
 import { printBol, printShippingLabel } from "./print-bol";
 import { calculateDensityClass, missingDimensionUnit, parseSmartQuote, SmartQuoteResult } from "@/lib/smart-quote-parser";
@@ -106,7 +107,7 @@ type AddressBookEntry = Omit<BookingParty, "save"> & {
 };
 
 type AddressBookTarget = "route-origin" | "route-destination" | "sender" | "receiver";
-type View = "new" | "quotes" | "orders" | "addresses" | "deposit" | "customers" | "settings" | "account";
+type View = "new" | "quotes" | "orders" | "addresses" | "deposit" | "customers" | "settings" | "account" | "quote-inputs";
 
 type AuthUser = {
   userId: string;
@@ -1329,7 +1330,7 @@ export default function Home() {
           <button type="button" className={`nav-item ${view === "quotes" ? "active" : ""}`} onClick={() => void showSavedQuotes()}><Icon>⌁</Icon>{tx("Quotes")}</button>
           <button type="button" className={`nav-item ${view === "orders" ? "active" : ""}`} onClick={() => void showOrders()}><Icon>▣</Icon>{tx("Orders")}</button>
           <button type="button" className={`nav-item ${view === "addresses" ? "active" : ""}`} onClick={() => void showAddressBookPage()}><Icon>⌂</Icon>{tx("Address book")}</button>
-          {!authUser?.legacy && (platformAdmin || customerAdmin) && <button type="button" className={`nav-item ${view === "customers" ? "active" : ""}`} onClick={() => void showCustomers()}><Icon>◎</Icon>{customerAdmin ? (language === "zh" ? "公司账户" : "Company Account") : tx("Customers")}</button>}
+          {!authUser?.legacy && (platformAdmin || customerAdmin) && <button type="button" className={`nav-item ${view === "customers" || view === "quote-inputs" ? "active" : ""}`} onClick={() => void showCustomers()}><Icon>◎</Icon>{language === "zh" ? "公司账户" : "Company Account"}</button>}
           <p className="nav-label second">{tx("ACCOUNT")}</p>
           {authUser && !authUser.legacy && <button type="button" className={`nav-item ${view === "account" ? "active" : ""}`} onClick={() => {
             if (view !== "account") setAccountBack(view);
@@ -1588,10 +1589,24 @@ export default function Home() {
           users={customers.find((customer) => customer.id === authUser.customerId)?.app_users ?? []}
           roleLabels={userRoleLabels} loading={customersLoading} error={customersError} createForm={createLoginUserForm}
           onProfile={() => { setAccountBack("customers"); setView("account"); }}
-          onQuotes={() => void showSavedQuotes()} onSave={updateUser} />}
+          onQuotes={() => void showSavedQuotes()} onQuoteInputs={() => setView("quote-inputs")} onSave={updateUser} />}
+
+        {view === "quote-inputs" && (platformAdmin || customerAdmin) && authUser && <QuoteInputHistory
+          key={`${authUser.userId}:${authUser.customerId}`} language={language}
+          companyName={platformAdmin ? (language === "zh" ? "所有客户" : "All customers") : authUser.customerName}
+          onUsers={() => void showCustomers()} onProfile={() => { setAccountBack("quote-inputs"); setView("account"); }}
+          onQuotes={() => void showSavedQuotes()} />}
 
         <div className="content workspace-page" hidden={view !== "customers" || !platformAdmin}>
-          <section className="page-heading"><div><p className="eyebrow">{tx("CUSTOMER ACCOUNTS")}</p><h1>{tx("Customers")}</h1><p>{tx("Create customer workspaces, control pricing, and choose which customer you are working on.")}</p></div><div className="active-customer"><span>{tx("Working on")}</span><strong>{authUser?.customerName}</strong></div></section>
+          <section className="page-heading">
+            <div><h1>{language === "zh" ? "公司账户" : "Company Account"}</h1><p>{tx("Create customer workspaces, control pricing, and choose which customer you are working on.")}</p></div>
+            <nav className="company-account-nav" aria-label="Company Account">
+              <button type="button" onClick={() => { setAccountBack("customers"); setView("account"); }}>{language === "zh" ? "个人资料" : "Profile"}</button>
+              <span aria-current="page">{language === "zh" ? "客户和用户" : "Customers & users"}</span>
+              <button type="button" onClick={() => setView("quote-inputs")}>Quote input</button>
+              <button type="button" onClick={() => void showSavedQuotes()}>{tx("Quotes")}</button>
+            </nav>
+          </section>
           {customersError && <p className="quotes-error" role="alert">{customersError}</p>}
           {customersNotice && <p className="settings-success" role="status">{customersNotice}</p>}
           <div className="customers-page-grid">

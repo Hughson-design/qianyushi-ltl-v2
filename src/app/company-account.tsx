@@ -14,10 +14,11 @@ type Props = {
   createForm: ReactNode;
   onProfile: () => void;
   onQuotes: () => void;
+  onQuoteInputs: () => void;
   onSave: (user: CompanyUser, requestedEmail?: string) => Promise<boolean>;
 };
 
-export function CompanyAccount({ language, customerName, currentUserId, users, roleLabels, loading, error, createForm, onProfile, onQuotes, onSave }: Props) {
+export function CompanyAccount({ language, customerName, currentUserId, users, roleLabels, loading, error, createForm, onProfile, onQuotes, onQuoteInputs, onSave }: Props) {
   const copy = (en: string, zh: string) => language === "zh" ? zh : en;
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
@@ -72,6 +73,7 @@ export function CompanyAccount({ language, customerName, currentUserId, users, r
         <nav className="company-account-nav" aria-label={copy("Company account", "公司账户")}>
           <button type="button" onClick={onProfile}>{copy("Profile", "个人资料")}</button>
           <span aria-current="page">{copy("Users", "用户")}</span>
+          <button type="button" onClick={onQuoteInputs}>Quote input</button>
           <button type="button" onClick={onQuotes}>{copy("Quotes", "报价")}</button>
         </nav>
       </header>

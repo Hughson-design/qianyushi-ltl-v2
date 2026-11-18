@@ -574,6 +574,12 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .company-user-pages { justify-content: flex-end; margin-top: 17px; font-size: 13px; }
 .company-user-pages button { min-width: 34px; min-height: 34px; border: 1px solid #c3d0d1; border-radius: 6px; color: #006e95; background: #fff; font-size: 18px; }
 .company-user-pages button:disabled { opacity: .4; }
+.quote-input-records { display: grid; gap: 12px; }
+.quote-input-record { margin: 0; padding: 16px 18px; }
+.quote-input-record header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 13px; }
+.quote-input-record time, .quote-input-record p { color: var(--muted); font-size: 12px; }
+.quote-input-record p { overflow-wrap: anywhere; }
+.quote-input-record pre { margin: 12px 0 0; padding: 12px; border-radius: 7px; background: #f3f7f5; color: var(--ink); font-size: 13px; line-height: 1.65; font-family: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 660px) {
   .company-user-toolbar .company-add-user { margin-inline-start: 0; }
   .company-users-list table, .company-users-list tbody { display: block; }
