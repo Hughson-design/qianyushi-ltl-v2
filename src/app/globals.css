@@ -409,13 +409,38 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .active-customer span, .active-customer strong { display: block; }
 .active-customer span { color: var(--muted); font-size: 9px; }
 .active-customer strong { margin-top: 4px; color: var(--green); font-size: 12px; }
-.customers-page-grid { display: grid; grid-template-columns: minmax(290px, .55fr) minmax(570px, 1.45fr); gap: 15px; align-items: start; }
+.customers-page-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
 .customer-create-panel, .customer-directory { margin-top: 0; }
 .customer-admin-column { display: contents; }
 .customer-admin-column .customer-create-panel:first-child { grid-column: 1; grid-row: 1; }
-.customer-admin-column .customer-create-panel:last-child { grid-column: 1; grid-row: 2; }
-.customer-directory { grid-column: 2; grid-row: 1; }
-.users-directory { grid-column: 2; grid-row: 2; margin-top: 0; }
+.customer-admin-column .customer-create-panel:last-child { grid-column: 2; grid-row: 1; }
+.customer-directory { grid-column: 1 / -1; grid-row: 2; }
+.users-directory { grid-column: 1 / -1; grid-row: 3; margin-top: 0; min-width: 0; }
+.customer-create-panel > summary { cursor: pointer; color: var(--green); font-size: 14px; font-weight: 750; }
+.workspace-directory-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.workspace-directory-heading h2 { margin: 0; font-size: 20px; }
+.workspace-directory-heading input { min-width: 0; width: min(250px, 100%); height: 36px; padding: 6px 10px; border: 1px solid #cbd8d1; border-radius: 7px; font: inherit; font-size: 13px; }
+.workspace-card-grid { margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: 12px; }
+.workspace-summary { min-width: 0; padding: 16px; border: 1px solid #dbe4df; border-radius: 10px; background: #fff; }
+.workspace-summary.selected { border-color: #619d7d; background: #f4faf6; }
+.workspace-summary header { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+.workspace-summary h3 { margin: 0; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.workspace-summary header p { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
+.workspace-summary .company-user-status { flex: none; font-size: 11px; }
+.workspace-summary dl { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; margin: 16px 0; padding: 12px 0; border-block: 1px solid #e1e9e4; }
+.workspace-summary dt { color: var(--muted); font-size: 11px; }
+.workspace-summary dd { margin: 5px 0 0; font-size: 15px; font-weight: 750; }
+.workspace-summary footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 11px; }
+.workspace-card-actions { display: flex; gap: 8px; align-items: center; }
+.workspace-card-actions > button { padding: 7px 10px; border: 1px solid #b7cfbf; border-radius: 7px; background: #edf6f0; color: #17553d; font-size: 12px; font-weight: 700; }
+.workspace-card-actions > button:disabled { opacity: .45; }
+.workspace-current { color: #17553d; font-weight: 750; }
+.workspace-editor { margin-top: 16px; padding: 16px; border: 1px solid #b7cfbf; border-radius: 9px; background: #f5f9f6; }
+.workspace-editor header { display: flex; justify-content: space-between; align-items: center; }
+.workspace-editor h3 { margin: 0; font-size: 16px; }
+.workspace-editor header button { padding: 6px 9px; border: 0; border-radius: 6px; background: #e5eee8; color: var(--green); }
+.workspace-editor-checks { display: flex; flex-wrap: wrap; gap: 16px; }
+.workspace-editor-checks label { display: inline-flex; align-items: center; gap: 6px; }
 .customer-create-panel h2, .customer-directory h2 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 20px; }
 .customer-form { margin-top: 16px; display: grid; gap: 11px; }
 .customer-form label, .customer-edit-grid label { color: #75817c; font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }

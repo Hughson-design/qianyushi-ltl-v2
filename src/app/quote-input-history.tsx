@@ -19,7 +19,7 @@ export function QuoteInputHistory({ language, companyName, onUsers, onProfile, o
     setError("");
     async function load() {
       try {
-        const response = await fetch(`/api/quote-inputs?format=json${cursor ? `&before=${cursor}` : ""}`, { cache: "no-store", signal: abort.signal });
+        const response = await fetch(`/api/quote-inputs${cursor ? `?before=${cursor}` : ""}`, { cache: "no-store", signal: abort.signal });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Unable to load quote inputs.");
         if (!abort.signal.aborted) { setRecords(result.records); setNext(result.next); }
@@ -45,7 +45,6 @@ export function QuoteInputHistory({ language, companyName, onUsers, onProfile, o
     </header>
     <div className="company-user-toolbar">
       <span>{copy("Submission times use Pacific Time (PT).", "提交时间按太平洋时间（PT）显示。")}</span>
-      <a href="/api/quote-inputs" download="smart-quote-history.txt" className="company-user-link">{copy("Download text file", "下载文本文件")}</a>
     </div>
     {error && <p role="alert" className="quotes-error">{error}</p>}
     {loading && <p role="status">{copy("Loading…", "加载中…")}</p>}
