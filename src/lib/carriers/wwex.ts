@@ -101,7 +101,7 @@ export async function getWwexRates(input: QuoteRequest): Promise<NormalizedRate[
               },
               hazMatItemInfo: null,
               isHazMat: item.hazmat,
-              NMFCNbr: null,
+              NMFCNbr: item.nmfc || null,
               quantity: String(item.pieces ?? item.pallets),
               weight: { value: item.totalWeight, unit: "LB" },
             }],

@@ -2,6 +2,7 @@ export type QuoteLineItem = {
   packaging: string;
   pallets: number;
   pieces?: number;
+  nmfc?: string;
   stackable: boolean;
   length: number;
   width: number;

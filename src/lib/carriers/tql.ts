@@ -96,6 +96,7 @@ export async function getTqlRates(input: QuoteRequest): Promise<NormalizedRate[]
       accessorials: input.services.map((service) => accessorialCodes[service]).filter(Boolean),
       quoteCommodities: input.items.map((item) => ({
         freightClassCode: item.freightClass,
+        ...(item.nmfc ? { nmfc: item.nmfc } : {}),
         unitTypeCode: packaging[item.packaging] || "PLT",
         description: (item.commodity || "General merchandise").slice(0, 250),
         quantity: item.pallets,

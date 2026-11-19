@@ -16,6 +16,7 @@ type IncomingItem = {
   packaging?: unknown;
   pallets?: unknown;
   pieces?: unknown;
+  nmfc?: unknown;
   stackable?: unknown;
   length?: unknown;
   width?: unknown;
@@ -94,10 +95,15 @@ function normalizeItem(item: IncomingItem, index: number): QuoteLineItem {
   const unitWeight = positiveNumber(item.unitWeight, `Line ${index + 1} unit weight`);
   const pieces = positiveNumber(item.pieces ?? pallets, `Line ${index + 1} pieces`);
   if (!Number.isSafeInteger(pieces)) throw new Error(`Line ${index + 1} pieces must be a whole number.`);
+  const nmfc = String(item.nmfc ?? "").trim();
+  if (nmfc && (nmfc.length > 9 || !/^\d+(?:-\d+)?$/.test(nmfc))) {
+    throw new Error(`Line ${index + 1} NMFC must contain only an item number and optional dash-separated subitem (up to 9 characters).`);
+  }
   return {
     packaging: String(item.packaging || "Pallet"),
     pallets,
     pieces,
+    nmfc,
     stackable: item.stackable !== false,
     length: positiveNumber(item.length, `Line ${index + 1} length`),
     width: positiveNumber(item.width, `Line ${index + 1} width`),

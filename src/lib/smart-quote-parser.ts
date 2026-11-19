@@ -3,6 +3,7 @@ export type SmartFreightItem = {
   stackable: boolean;
   pallets: string;
   pieces: string;
+  nmfc: string;
   length: string;
   width: string;
   height: string;
@@ -125,6 +126,7 @@ function freightItemFromLine(line: string, conversions: string[], missing: strin
     stackable,
     pallets,
     pieces: line.match(/(\d+)\s*(?:件|pieces?\b|pcs\b)/i)?.[1] ?? pallets,
+    nmfc: line.match(/\bNMFC\s*(?:#|:|：)?\s*(\d+(?:-\d+)?)/i)?.[1] ?? "",
     length: needsUnit ? "" : rounded(convertedLength),
     width: needsUnit ? "" : rounded(convertedWidth),
     height: needsUnit ? "" : rounded(convertedHeight),

@@ -19,6 +19,7 @@ export type ShipmentItem = {
   stackable: boolean;
   pallets: string | number;
   pieces?: string | number;
+  nmfc?: string;
   length: string | number;
   width: string | number;
   height: string | number;

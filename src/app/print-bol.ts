@@ -24,6 +24,7 @@ type PrintShipment = {
   freight_items: Array<{
     pallets: string;
     pieces?: string | number;
+    nmfc?: string;
     packaging: string;
     totalWeight?: number;
     unitWeight?: string | number;
@@ -52,7 +53,7 @@ export function printBol(shipment: PrintShipment) {
   ].filter(Boolean).map(escape).join("<br>");
   const items = shipment.freight_items ?? [];
   const rows = items.map((item) =>
-    `<tr><td>${escape(item.pallets)}</td><td>${escape(item.packaging)}</td><td>${escape(item.pieces ?? item.pallets)}</td><td>${escape(item.totalWeight)}</td><td>${item.hazmat ? "X" : ""}</td><td>${escape(item.commodity)}</td><td></td><td>${escape(item.freightClass)}</td></tr>`
+    `<tr><td>${escape(item.pallets)}</td><td>${escape(item.packaging)}</td><td>${escape(item.pieces ?? item.pallets)}</td><td>${escape(item.totalWeight)}</td><td>${item.hazmat ? "X" : ""}</td><td>${escape(item.commodity)}</td><td>${escape(item.nmfc)}</td><td>${escape(item.freightClass)}</td></tr>`
   ).join("");
 
   preview.document.open();
