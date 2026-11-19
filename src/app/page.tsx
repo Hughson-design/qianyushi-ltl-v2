@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { CompanyAccount } from "./company-account";
+import { ShipmentReaderPanel } from "./shipment-reader-panel";
 import { MyAccount } from "./my-account";
 import { QuoteInputHistory } from "./quote-input-history";
 import { CustomerWorkspaces } from "./customer-workspaces";
@@ -113,7 +114,7 @@ type AddressBookEntry = Omit<BookingParty, "save"> & {
 };
 
 type AddressBookTarget = "route-origin" | "route-destination" | "sender" | "receiver";
-type View = "new" | "quotes" | "orders" | "addresses" | "deposit" | "customers" | "settings" | "account" | "quote-inputs";
+type View = "reader" | "new" | "quotes" | "orders" | "addresses" | "deposit" | "customers" | "settings" | "account" | "quote-inputs";
 
 type AuthUser = {
   userId: string;
@@ -231,7 +232,8 @@ function Icon({ children }: { children: React.ReactNode }) {
 }
 
 export default function Home() {
-  const quickQuote = usePathname() === "/quick-quote";
+  const pathname = usePathname();
+  const quickQuote = pathname === "/quick-quote";
   const [language, setLanguage] = useState<"en" | "zh">("en");
   const [helpOpen, setHelpOpen] = useState(false);
   const [authState, setAuthState] = useState<"checking" | "setup" | "login" | "ready" | "signed-out">("checking");
@@ -239,7 +241,7 @@ export default function Home() {
   const [authForm, setAuthForm] = useState({ name: "Cathy Huang", email: "", password: "" });
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
-  const [view, setView] = useState<View>("new");
+  const [view, setView] = useState<View>(pathname === "/shipment-reader" ? "reader" : "new");
   const [accountBack, setAccountBack] = useState<View>("new");
   const [adminEditId, setAdminEditId] = useState<string | null>(null);
   const [items, setItems] = useState<FreightItem[]>([initialItem]);
@@ -1186,7 +1188,10 @@ export default function Home() {
   }
 
   async function smartFill() {
-    const result = parseSmartQuote(smartText);
+    await fillShipmentDraft(parseSmartQuote(smartText));
+  }
+
+  async function fillShipmentDraft(result: SmartQuoteResult) {
     const previousCheck = deliveryCheck;
     clearDeliveryCheck();
     setSmartResult(result);
@@ -1339,6 +1344,7 @@ export default function Home() {
           <button type="button" className={`nav-item ${view === "new" ? "active" : ""}`} onClick={() => setView("new")}><Icon>＋</Icon>{tx("New quote")}</button>
           <button type="button" className={`nav-item ${view === "quotes" ? "active" : ""}`} onClick={() => void showSavedQuotes()}><Icon>⌁</Icon>{tx("Quotes")}</button>
           <button type="button" className={`nav-item ${view === "orders" ? "active" : ""}`} onClick={() => void showOrders()}><Icon>▣</Icon>{tx("Orders")}</button>
+          <button type="button" className={`nav-item ${view === "reader" ? "active" : ""}`} onClick={() => setView("reader")}><Icon>▤</Icon>{language === "zh" ? "资料识别" : "Shipment reader"}</button>
           <button type="button" className={`nav-item ${view === "addresses" ? "active" : ""}`} onClick={() => void showAddressBookPage()}><Icon>⌂</Icon>{tx("Address book")}</button>
           {!authUser?.legacy && (platformAdmin || customerAdmin) && <button type="button" className={`nav-item ${view === "customers" || view === "quote-inputs" ? "active" : ""}`} onClick={() => void showCustomers()}><Icon>◎</Icon>{language === "zh" ? "公司账户" : "Company Account"}</button>}
           <p className="nav-label second">{tx("ACCOUNT")}</p>
@@ -1359,10 +1365,15 @@ export default function Home() {
 
       <main>
         <header className="topbar">
-          <div className="crumb"><span>{tx(view === "new" || view === "quotes" ? "Quotes" : view === "addresses" ? "Address book" : view.charAt(0).toUpperCase() + view.slice(1))}</span>{view === "new" && <><b>/</b> {tx("New quote")}</>}</div>
+          <div className="crumb"><span>{tx(view === "new" || view === "quotes" ? "Quotes" : view === "addresses" ? "Address book" : view === "reader" ? (language === "zh" ? "资料识别" : "Shipment reader") : view.charAt(0).toUpperCase() + view.slice(1))}</span>{view === "new" && <><b>/</b> {tx("New quote")}</>}</div>
           <div className="top-actions"><button type="button" className="language-toggle" onClick={toggleLanguage}>{language === "en" ? "中文" : "English"}</button><button type="button" className="help" aria-label={language === "zh" ? "打开帮助" : "Open help"} title={language === "zh" ? "帮助" : "Help"} onClick={() => setHelpOpen(true)}>?</button></div>
         </header>
 
+        {view === "reader" && <div className="content"><ShipmentReaderPanel language={language} onUse={(result, text) => {
+          setSmartText(text);
+          void fillShipmentDraft(result); setView("new");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }} /></div>}
         <div className="content" id="quote" hidden={view !== "new"}>
           <section className="page-heading">
             <div><p className="eyebrow">{tx("CREATE SHIPMENT")}</p><h1>{tx("Get an LTL quote")}</h1></div>

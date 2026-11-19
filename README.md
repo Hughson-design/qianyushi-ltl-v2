@@ -16,7 +16,7 @@ Shenzhen Qianyushi Supply Chain Service Co., Ltd. 的轻量化美国 LTL 询价�
 - Freight Details 固定使用 inch / lb。
 - 多货物行、包装类型、可堆叠、托数、尺寸、单托重量、自动总重量、自动密度 Class、危险品标记、英文品名与货值。
 - 美国 ZIP Code 自动匹配州和城市；多城市 ZIP Code 可下拉选择。
-- WWEX/SpeedShip 与 Priority1 沙盒实时询价。
+- WWEX/SpeedShip、Priority1 与 TQL 实时询价适配。
 - 每个渠道分别取最低五个报价，再统一排序。
 - 客户销售价按 `max(成本价 × (1 + 加价率), 成本价 + 最低加价)` 计算。
 - 保存 Quote 和完整 Sender/Receiver 下单资料。
@@ -25,6 +25,7 @@ Shenzhen Qianyushi Supply Chain Service Co., Ltd. 的轻量化美国 LTL 询价�
 - Void Shipment 同时取消承运商运单/Pickup，并在成功后退回押金。
 - WWEX BOL 文件下载。
 - Priority1 按 Reference 查重和异常响应恢复，防止重复创建运单。
+- TQL 报价、Tender、BOL 邮件发送与重复 Tender 恢复；密钥到位并获准测试后启用。
 - Orders、Quotes、Address Book、Deposit、Customers、Settings 和 Help 页面。
 
 ## 报价界面更新（2026-11-14）
@@ -36,12 +37,15 @@ Shenzhen Qianyushi Supply Chain Service Co., Ltd. 的轻量化美国 LTL 询价�
 
 ## 技术栈
 
+资料识别页面更新（2026-11-19）：新增 `/shipment-reader`，支持粘贴文字/截图和上传图片、PDF、Excel、Word、TXT/CSV，先生成可编辑草稿及核对提醒，再手动带入询价。AI 文件识别需配置服务器 `OPENAI_API_KEY`，未配置时普通文字解析仍可使用；不会自动询价或创建运单。参见 [使用与配置说明](docs/SHIPMENT-READER.md)。
+
 - Next.js 16 App Router
 - React 19
 - TypeScript
 - Supabase Postgres、Auth 与 REST/RPC
 - Priority1 LTL API
 - WWEX/SpeedShip API
+- TQL LTL API
 - pnpm
 
 ## 项目结构
@@ -57,7 +61,7 @@ Shenzhen Qianyushi Supply Chain Service Co., Ltd. 的轻量化美国 LTL 询价�
 │  │  └─ page.tsx              当前单页工作台界面
 │  ├─ data/                    ZIP Code 与城市数据
 │  └─ lib/
-│     ├─ carriers/             Priority1 和 WWEX 适配器
+│     ├─ carriers/             Priority1、WWEX 和 TQL 适配器
 │     ├─ auth-server.ts        登录会话和角色权限
 │     ├─ smart-quote-parser.ts Smart Quote 解析器
 │     └─ supabase-server.ts    Supabase 服务端访问封装
@@ -79,7 +83,7 @@ Copy-Item .env.example .env.local
 pnpm dev
 ```
 
-在 `.env.local` 中填入 Supabase、Priority1 和 WWEX 沙盒配置，然后打开：
+在 `.env.local` 中填入 Supabase 和需要启用的承运商配置，然后打开：
 
 ```text
 http://localhost:3000
@@ -105,6 +109,7 @@ pnpm start
 6. `outputs/supabase-enable-settings.sql`
 7. `outputs/supabase-complete-sidebar-features.sql`
 8. `outputs/supabase-correct-qianyushi-name.sql`
+9. `outputs/supabase-enable-tql.sql`
 
 这些脚本使用 `IF NOT EXISTS` 或兼容性修改为主，但生产环境执行前仍应备份数据库。完整说明见 [Supabase 部署说明](docs/SUPABASE-SETUP.md)。
 
@@ -126,6 +131,15 @@ pnpm start
 | `WWEX_CLIENT_SECRET` | WWEX OAuth Client Secret | 绝对不可以 |
 | `WWEX_AUDIENCE` | WWEX OAuth audience | 建议保密 |
 | `WWEX_API_BASE` | WWEX 沙盒 API 根地址 | 建议保密 |
+| `TQL_AUTH_URL` | TQL OAuth 地址 | 建议保密 |
+| `TQL_API_BASE` | TQL LTL API 根地址 | 建议保密 |
+| `TQL_SUBSCRIPTION_KEY` | TQL API subscription key | 绝对不可以 |
+| `TQL_CLIENT_ID` | TQL OAuth Client ID | 不可以 |
+| `TQL_CLIENT_SECRET` | TQL OAuth Client Secret | 绝对不可以 |
+| `TQL_USERNAME` | TQL TRAX 用户名 | 不可以 |
+| `TQL_PASSWORD` | TQL TRAX 密码 | 绝对不可以 |
+| `TQL_SCOPE` | TQL OAuth scopes（空格分隔） | 建议保密 |
+| `TQL_BOL_EMAIL` | 接收 TQL BOL 的邮箱 | 不建议公开 |
 
 ## 安全原则
 
@@ -143,6 +157,7 @@ pnpm start
 - WWEX/ESTES 沙盒已成功返回 BOL 并安排 Pickup。
 - Priority1/ABF 沙盒已成功返回 BOL `60016048142` 与 Pickup `WWW0000000`。
 - Priority1 Reference 查重确认同一 Reference 只有一票运单。
+- TQL 适配器已通过类型检查和正式构建；真实 API 验收等待 TQL 生产凭据及批准的测试时段。
 - R&L 沙盒曾出现承运商在服务器端创建运单、但响应字段异常的情况；当前版本已在重试前查询 Reference，并可在只有一条且 BOL/Pickup 齐全时恢复该结果。
 
 ## 详细文档
@@ -163,3 +178,5 @@ pnpm start
 - 危险品 BOL 的完整 UN Number、Proper Shipping Name、Packing Group 等申报
 
 生产上线前必须换成生产 API 地址与密钥，并使用小额、可撤销测试单逐家承运商验收。
+
+TQL 当前没有提供取消 API。TQL 运单必须先联系 TQL 人工取消，系统不会在承运商取消前自动退款。
