@@ -53,6 +53,7 @@ async function getToken(force = false) {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
       "Ocp-Apim-Subscription-Key": config.subscriptionKey,
     },
     body,
@@ -79,7 +80,8 @@ async function getToken(force = false) {
     const names = (record: Record<string, unknown>) => Object.keys(record).filter((key) => /^[a-zA-Z_][a-zA-Z0-9_]{0,39}$/.test(key)).slice(0, 12).join(", ") || "none";
     const shape = envelopes.map((envelope, index) => `${index === 0 ? "root" : "envelope"}: ${names(envelope)}`).join("; ");
     const format = data === null ? (response.headers.get("content-type")?.split(";")[0] || "non-JSON") : Array.isArray(data) ? "JSON array" : typeof data;
-    throw new Error(`TQL authentication returned HTTP ${response.status}. Response format: ${format}. Response fields (${shape}). Check the subscription key, TRAX login, scopes and authentication mode.`);
+    const htmlHint = format === "text/html" ? /captcha|challenge|verify you are human|bot protection|incapsula|imperva|cloudflare/i.test(raw) ? " HTML category: access verification." : /access denied|request blocked|forbidden|security policy|blocked request/i.test(raw) ? " HTML category: access denied." : " HTML category: webpage, not an API token." : "";
+    throw new Error(`TQL authentication returned HTTP ${response.status}. Response format: ${format}. Response fields (${shape}).${htmlHint} Check the subscription key, TRAX login, scopes and authentication mode.`);
   }
   cachedToken = { value: token, expiresAt: Date.now() + (Number.isFinite(expires) && expires > 0 ? Math.min(expires, 3600) : 3600) * 1000 };
   return cachedToken.value;

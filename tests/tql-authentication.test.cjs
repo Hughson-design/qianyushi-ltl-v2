@@ -29,6 +29,7 @@ test('public client requests a token without secret, quote, shipment or carrier 
   assert.equal(init.body.has('client_secret'), false);
   assert.equal(init.body.get('username'), 'fixture-user');
   assert.equal(init.headers['Ocp-Apim-Subscription-Key'], 'fixture-key');
+  assert.equal(init.headers.Accept, 'application/json');
   assert.ok(init.signal); assert.equal(init.cache, 'no-store');
   await api.getToken(); assert.equal(api.calls.length, 1, 'normal callers reuse cached token');
 });
