@@ -8,11 +8,11 @@ function load(path, names, globals) {
   return vm.runInNewContext(code + '\n;({' + names.join(',') + '})', { URL, URLSearchParams, Response, AbortSignal, Date, ...globals });
 }
 const credentials = { TQL_SUBSCRIPTION_KEY: 'fixture-key', TQL_CLIENT_ID: 'fixture-id', TQL_USERNAME: 'fixture-user', TQL_PASSWORD: 'fixture-password', TQL_SCOPE: 'fixture-scope' };
-function carrier(overrides = {}, response = { access_token: 'fixture-token', expires_in: 3600 }, status = 200) {
+function carrier(overrides = {}, response = { access_token: 'fixture-token', expires_in: 3600 }, status = 200, raw = false) {
   const calls = [];
   const api = load('src/lib/carriers/tql.ts', ['testTqlAuthentication', 'getToken', 'tqlConnectionStatus'], {
     process: { env: { ...credentials, ...overrides } },
-    fetch: async (url, init) => { calls.push({ url, init }); return Response.json(response, { status }); },
+    fetch: async (url, init) => { calls.push({ url, init }); return raw ? new Response(response, { status, headers: { 'content-type': 'text/plain' } }) : Response.json(response, { status }); },
   });
   return { ...api, calls };
 }
@@ -47,6 +47,19 @@ test('accepts camel-case token fields and JSON envelopes without exposing token 
   }
   const error = carrier({}, { content: { error_description: 'fixture-password' } });
   await assert.rejects(error.testTqlAuthentication(), (failure) => /root: content/.test(failure.message) && /error_description/.test(failure.message) && !/fixture-password/.test(failure.message));
+});
+test('accepts a direct JWT as plain text or JSON string but rejects HTML and arbitrary strings', async () => {
+  const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJmaXh0dXJlIn0.c2lnbmF0dXJl';
+  for (const raw of [true, false]) {
+    const api = carrier({}, jwt, 200, raw);
+    assert.equal((await api.testTqlAuthentication()).authenticated, true);
+    assert.equal(await api.getToken(), jwt);
+    assert.equal(api.calls[0].init.redirect, 'error');
+  }
+  for (const body of ['<html>fixture-password</html>', 'fixture-password']) {
+    const api = carrier({}, body, 200, true);
+    await assert.rejects(api.testTqlAuthentication(), (error) => !error.message.includes(body));
+  }
 });
 test('missing credentials, invalid mode and non-TQL destinations fail before transmitting credentials', async () => {
   for (const env of [{ TQL_PASSWORD: '' }, { TQL_AUTH_MODE: 'unknown' }, { TQL_AUTH_URL: 'https://other.example/token' }]) {

@@ -57,12 +57,17 @@ async function getToken(force = false) {
     },
     body,
     cache: "no-store",
+    redirect: "error",
     signal: AbortSignal.timeout(20_000),
   });
-  const data: unknown = await response.json().catch(() => null);
+  const raw = await response.text();
+  let data: unknown = null;
+  try { data = JSON.parse(raw); } catch { /* A public-client endpoint may return the JWT directly. */ }
   const root = data && typeof data === "object" && !Array.isArray(data) ? data as Record<string, unknown> : {};
   const envelopes = [root, root.content, root.data].filter((value): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value));
-  let token = "", expires = 3600;
+  const direct = typeof data === "string" ? data.trim() : raw.trim();
+  const directJwt = /^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(direct);
+  let token = directJwt ? direct : "", expires = 3600;
   for (const envelope of envelopes) {
     const candidate = envelope.access_token ?? envelope.accessToken ?? envelope.token;
     if (typeof candidate === "string" && candidate.trim()) {
@@ -73,7 +78,8 @@ async function getToken(force = false) {
   if (!response.ok || !token) {
     const names = (record: Record<string, unknown>) => Object.keys(record).filter((key) => /^[a-zA-Z_][a-zA-Z0-9_]{0,39}$/.test(key)).slice(0, 12).join(", ") || "none";
     const shape = envelopes.map((envelope, index) => `${index === 0 ? "root" : "envelope"}: ${names(envelope)}`).join("; ");
-    throw new Error(`TQL authentication returned HTTP ${response.status}. Response fields (${shape}). Check the subscription key, TRAX login, scopes and authentication mode.`);
+    const format = data === null ? (response.headers.get("content-type")?.split(";")[0] || "non-JSON") : Array.isArray(data) ? "JSON array" : typeof data;
+    throw new Error(`TQL authentication returned HTTP ${response.status}. Response format: ${format}. Response fields (${shape}). Check the subscription key, TRAX login, scopes and authentication mode.`);
   }
   cachedToken = { value: token, expiresAt: Date.now() + (Number.isFinite(expires) && expires > 0 ? Math.min(expires, 3600) : 3600) * 1000 };
   return cachedToken.value;
