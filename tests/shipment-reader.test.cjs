@@ -15,6 +15,7 @@ function harness({ signedIn = true, key = '', payload, status = 200 } = {}) {
   const requests = [];
   const route = load('src/app/api/shipment-reader/route.ts', ['GET', 'POST'], {
     ...reader,
+    xlsxSheetText: async () => 'Worksheet: Freight\nRow 1: [[1,"重量(KG)"],[2,"长(cm)"]]\nRow 2: [[1,100],[2,108]]',
     NextResponse: { json: (body, options) => Response.json(body, options) },
     requireAppSession: async () => signedIn ? { session: { userId: 'test-user', customerId: 'test-customer' } } : { response: Response.json({ error: 'Sign in' }, { status: 401 }) },
     process: { env: { OPENAI_API_KEY: key } },
@@ -65,7 +66,9 @@ test('sends images and supported document types to Responses only with explicit 
   assert.equal(sent.body.model, 'gpt-5.4-mini');
   assert.equal(sent.body.store, false); assert.equal(sent.body.text.format.strict, true);
   assert.equal(sent.body.input[0].content.filter((part) => part.type === 'input_image').length, 1);
-  assert.equal(sent.body.input[0].content.filter((part) => part.type === 'input_file').length, 4);
+  assert.equal(sent.body.input[0].content.filter((part) => part.type === 'input_file').length, 3);
+  assert.match(sent.body.input[0].content[0].text, /EXCEL CELL DATA/);
+  assert.match(sent.body.input[0].content[0].text, /重量\(KG\)/);
   assert.equal(sent.body.tools, undefined);
 });
 test('rejects incomplete/refused AI responses and throttles repeated paid requests', async () => {

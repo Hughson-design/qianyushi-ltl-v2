@@ -54,6 +54,16 @@
 .reader-route strong { font-size: 19px; margin: 4px 0; }
 .reader-route p { margin: 0; overflow-wrap: anywhere; font-size: 11px; line-height: 1.6; }
 .reader-table-scroll { overflow-x: auto; }
+.reader-freight-editor { margin: 16px 0; padding: 14px; border: 1px solid #b8d4c5; background: #f7fbf8; border-radius: 10px; }
+.reader-freight-editor h3 { margin: 0; font: 700 15px/1.5 ui-sans-serif, system-ui, sans-serif; }
+.reader-freight-editor p { font-size: 12px; line-height: 1.6; color: #52695d; }
+.reader-freight-editor fieldset { min-width: 0; margin: 12px 0; border: 1px solid #d2dfd7; border-radius: 8px; padding: 10px; }
+.reader-freight-editor legend { padding: 0 5px; font-size: 12px; font-weight: 700; }
+.reader-edit-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-bottom: 10px; }
+.reader-edit-grid label { display: grid; gap: 4px; font-size: 11px; color: #405b4b; }
+.reader-edit-grid input, .reader-edit-grid select { min-width: 0; width: 100%; padding: 8px; border: 1px solid #bdcfc4; background: white; border-radius: 6px; color: #172e23; font: 14px/1.4 ui-sans-serif, system-ui, sans-serif; }
+.reader-edit-commodity { grid-column: span 3; }
+@media (max-width: 600px) { .reader-edit-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .reader-edit-commodity { grid-column: span 2; } .reader-edit-grid input, .reader-edit-grid select { font-size: 16px; } }
 .reader-table { width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; }
 .reader-table th { background: #f0f5f2; color: #536d5e; font-weight: 600; white-space: nowrap; }
 .reader-table td, .reader-table th { padding: 10px 8px; border-bottom: 1px solid #e1e9e4; }

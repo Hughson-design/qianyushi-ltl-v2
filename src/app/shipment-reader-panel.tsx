@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type FormEvent } from "react";
 import { READER_ACCEPT, READER_MAX_BYTES, READER_MAX_FILES, READER_MAX_TEXT, READER_MIME, readerExtension, type ReaderResult } from "@/lib/shipment-reader";
-import { parseSmartQuote, type SmartQuoteResult } from "@/lib/smart-quote-parser";
+import { parseSmartQuote, type SmartQuoteResult, type SmartFreightItem } from "@/lib/smart-quote-parser";
 
 type Attachment = { id: string; file: File; preview?: string };
 type Props = { language: "zh" | "en"; onUse: (result: SmartQuoteResult, text: string) => void };
+type EditableFreight = SmartFreightItem & { dimensionUnit: string; weightUnit: string };
+const blankFreight = (): EditableFreight => ({ packaging: "Pallet", pallets: "1", pieces: "1", length: "", width: "", height: "", unitWeight: "", commodity: "", nmfc: "", declaredValue: "", stackable: true, hazmat: false, dimensionUnit: "in", weightUnit: "lb" });
 
 export function ShipmentReaderPanel({ language, onUse }: Props) {
   const zh = language === "zh";
@@ -16,6 +18,8 @@ export function ShipmentReaderPanel({ language, onUse }: Props) {
   const [result, setResult] = useState<ReaderResult | null>(null);
   const [reviewText, setReviewText] = useState("");
   const [reviewed, setReviewed] = useState(false);
+  const [freightEdits, setFreightEdits] = useState<EditableFreight[]>([]);
+  const [freightDirty, setFreightDirty] = useState(false);
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
   const [useAi, setUseAi] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -40,7 +44,22 @@ export function ShipmentReaderPanel({ language, onUse }: Props) {
     };
   }, []);
 
-  function invalidate() { setResult(null); setReviewText(""); setReviewed(false); setError(""); }
+  function invalidate() { setResult(null); setReviewText(""); setReviewed(false); setError(""); setFreightEdits([]); setFreightDirty(false); }
+  function loadFreight(value: string) {
+    const items = parseSmartQuote(value).items;
+    setFreightEdits(items.length ? items.map((item) => ({ ...item, dimensionUnit: "in", weightUnit: "lb" })) : [blankFreight()]);
+    setFreightDirty(false);
+  }
+  function editFreight(index: number, field: keyof EditableFreight, value: string) {
+    setFreightEdits((items) => items.map((item, i) => i === index ? { ...item, [field]: value } : item));
+    setFreightDirty(true); setReviewed(false);
+  }
+  function applyFreight() {
+    const addresses = reviewText.split(/\r?\n/).slice(0, 2);
+    const lines = freightEdits.map((item) => `quantity: ${item.pallets || 0}, ${item.packaging}, ${item.pieces || 0} pieces, dimensions: ${item.length || 0}×${item.width || 0}×${item.height || 0} ${item.dimensionUnit}, weight: ${item.unitWeight || 0} ${item.weightUnit}, commodity: ${item.commodity || ""}${item.nmfc ? `, NMFC ${item.nmfc}` : ""}${item.declaredValue ? `, declared value: ${item.declaredValue}` : ""}${!item.stackable ? ", non-stackable" : ""}${item.hazmat ? ", hazmat" : ""}`);
+    const next = [...addresses, ...lines].join("\n");
+    setReviewText(next); setFreightDirty(false); setReviewed(false);
+  }
   function replaceAttachments(next: Attachment[]) { attachmentsRef.current = next; setAttachments(next); }
 
   function addFiles(incoming: File[]) {
@@ -100,7 +119,7 @@ export function ShipmentReaderPanel({ language, onUse }: Props) {
       const data = await response.json();
       if (!response.ok) throw new Error(response.status === 401 ? copy("登录已过期，请刷新页面重新登录。", "Your session expired. Refresh and sign in again.") : data.error || "Unable to read the shipment.");
       if (id !== sequence.current) return;
-      setResult(data); setReviewText(data.text || "");
+      setResult(data); setReviewText(data.text || ""); loadFreight(data.text || "");
     } catch (error) {
       if (id === sequence.current && !controller.signal.aborted) setError(error instanceof Error ? error.message : copy("识别失败，请重试。", "Recognition failed. Please try again."));
     } finally { if (id === sequence.current) setBusy(false); }
@@ -110,7 +129,8 @@ export function ShipmentReaderPanel({ language, onUse }: Props) {
     "pickup address and ZIP code": "提货地址和邮编", "delivery address and ZIP code": "收货地址和邮编",
     "dimensions and weight": "货物尺寸及重量", "unrecognized freight or service line": "未识别的货物或服务行",
   };
-  const canUse = Boolean(result && reviewText.trim() && parsed.items.length && !parsed.missing.length && reviewed && !busy);
+  const validFreight = parsed.items.length > 0 && parsed.items.every((item) => [item.pallets, item.pieces, item.length, item.width, item.height, item.unitWeight].every((value) => Number.isFinite(Number(value)) && Number(value) > 0) && Number.isInteger(Number(item.pallets)) && Number.isInteger(Number(item.pieces)));
+  const canUse = Boolean(result && reviewText.trim() && validFreight && !parsed.missing.length && reviewed && !busy && !freightDirty);
   return <div className="reader-page" onPaste={paste}>
     <section className="page-heading reader-heading"><div><p className="eyebrow">SHIPMENT READER</p><h1>{copy("资料识别", "Shipment reader")}</h1><p>{copy("粘贴文字、截图或上传文件，先核对，再带入询价。", "Paste text or screenshots, or upload documents. Review before quoting.")}</p></div><span className="reader-draft-pill">{copy("仅生成草稿", "Draft only")}</span></section>
     <div className="reader-layout">
@@ -143,12 +163,30 @@ export function ShipmentReaderPanel({ language, onUse }: Props) {
           <div className="reader-method">{result.method === "ai" ? copy("AI 识别草稿", "AI extraction draft") : copy("普通文字解析", "Basic text parsing")}</div>
           {result.warnings.length > 0 && <div className="reader-warning" role="status"><strong>{copy("需要确认", "Please verify")}</strong><ul>{result.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul></div>}
           <label className="reader-text-label" htmlFor="reader-review">{copy("可编辑的询价文字", "Editable shipment text")}</label>
-          <textarea id="reader-review" value={reviewText} maxLength={READER_MAX_TEXT} onChange={(event) => { setReviewText(event.target.value); setReviewed(false); }} />
+          <textarea id="reader-review" value={reviewText} maxLength={READER_MAX_TEXT} onChange={(event) => { setReviewText(event.target.value); setReviewed(false); loadFreight(event.target.value); }} />
+          <section className="reader-freight-editor" aria-label={copy("修改尺寸与重量", "Edit dimensions and weights")}>
+            <h3>{copy("在这里补全或修改货物", "Complete or correct freight here")}</h3>
+            <p>{copy("直接填写下面的尺寸和单件重量，再点“应用货物修改”。不同尺寸或重量请分行。", "Edit dimensions and weight per handling unit below, then apply. Use separate rows for different sizes or weights.")}</p>
+            {freightEdits.map((item, index) => <fieldset key={index}>
+              <legend>{copy("货物", "Freight")} {index + 1}</legend>
+              <div className="reader-edit-grid">
+                <label>{copy("包装", "Packaging")}<select value={item.packaging} onChange={(event) => editFreight(index, "packaging", event.target.value)}>{["Pallet", "Crate", "Carton", "Bale", "Roll", "Loose"].map((value) => <option key={value}>{value}</option>)}</select></label>
+                {([['pallets', copy('包装数量', 'Units')], ['pieces', copy('件数', 'Pieces')], ['length', copy('长', 'Length')], ['width', copy('宽', 'Width')], ['height', copy('高', 'Height')], ['unitWeight', copy('每包装重量', 'Unit weight')]] as const).map(([field, label]) => <label key={field}>{label}<input type="number" min="0" step={field === "pallets" || field === "pieces" ? "1" : "any"} aria-label={`${label} ${index + 1}`} value={item[field]} onChange={(event) => editFreight(index, field, event.target.value)} /></label>)}
+                <label>{copy("尺寸单位", "Dimension unit")}<select aria-label={`Dimension unit ${index + 1}`} value={item.dimensionUnit} onChange={(event) => editFreight(index, "dimensionUnit", event.target.value)}><option>in</option><option>cm</option><option>m</option></select></label>
+                <label>{copy("重量单位", "Weight unit")}<select aria-label={`Weight unit ${index + 1}`} value={item.weightUnit} onChange={(event) => editFreight(index, "weightUnit", event.target.value)}><option>lb</option><option>kg</option></select></label>
+                <label className="reader-edit-commodity">{copy("品名", "Commodity")}<input value={item.commodity} onChange={(event) => editFreight(index, "commodity", event.target.value)} /></label>
+              </div>
+              <button type="button" className="reader-secondary" onClick={() => { setFreightEdits((items) => items.filter((_, i) => i !== index)); setFreightDirty(true); setReviewed(false); }}>{copy("移除此行", "Remove row")}</button>
+            </fieldset>)}
+            <div className="reader-form-actions"><button type="button" className="reader-secondary" onClick={() => { setFreightEdits((items) => [...items, blankFreight()]); setFreightDirty(true); setReviewed(false); }}>{copy("增加货物行", "Add freight row")}</button><button type="button" className="reader-primary" disabled={!freightDirty} onClick={applyFreight}>{copy("应用货物修改", "Apply freight changes")}</button></div>
+            {freightDirty && <p role="status">{copy("有未应用的修改，请先点击“应用货物修改”。", "Apply your freight changes before using the quote.")}</p>}
+            {!validFreight && !freightDirty && <p role="status">{copy("请填写大于0的长、宽、高和重量；包装数量、件数须为正整数。", "Enter positive dimensions and weight; units and pieces must be positive whole numbers.")}</p>}
+          </section>
           <div className="reader-route"><article><small>{copy("提货地", "Ship from")}</small><strong>{parsed.originZip || "—"}</strong><p>{parsed.originAddress || copy("尚未识别", "Not identified")}</p></article><span aria-hidden="true">→</span><article><small>{copy("收货地", "Ship to")}</small><strong>{parsed.destinationZip || "—"}</strong><p>{parsed.destinationAddress || copy("尚未识别", "Not identified")}</p></article></div>
           {parsed.items.length > 0 && <div className="reader-table-scroll"><table className="reader-table"><thead><tr>{[copy("包装 / 托数", "Packaging / units"), copy("件数", "Pieces"), copy("尺寸 (in)", "Dimensions (in)"), copy("每托重量 (lb)", "Unit weight (lb)"), copy("总重量 (lb)", "Total weight (lb)")].map((label) => <th key={label}>{label}</th>)}</tr></thead><tbody>{parsed.items.map((item, index) => <tr key={index}><td>{item.packaging} × {item.pallets}</td><td>{item.pieces}</td><td>{item.length} × {item.width} × {item.height}</td><td>{item.unitWeight}</td><td>{Math.round(Number(item.pallets) * Number(item.unitWeight))}</td></tr>)}</tbody></table></div>}
           {parsed.services.length > 0 && <div className="reader-service-tags">{parsed.services.map((service) => <span key={service}>{service}</span>)}</div>}
           {parsed.conversions.length > 0 && <p className="reader-conversions">{parsed.conversions.join(" · ")}</p>}
-          {parsed.missing.length > 0 && <p className="reader-error">{copy("请补全：", "Please complete: ")}{parsed.missing.map((field) => zh ? missingLabels[field] || field : field).join(" · ")}</p>}
+          {parsed.missing.length > 0 && <p className="reader-error">{copy("请补全：", "Please complete: ")}{parsed.missing.map((field) => zh ? missingLabels[field] || field : field).join(" · ")}{copy("。地址请在上方询价文字框修改；尺寸和重量请在“补全或修改货物”中填写。", ". Edit addresses in the shipment text above; enter dimensions and weights in the freight editor.")}</p>}
           <label className="reader-review-check"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} /><span>{copy("我已核对地址、尺寸、单位、托数、件数及单托/总重量，并处理上述提醒。", "I have checked the route, dimensions, units, piece/handling-unit counts, weights, and all warnings.")}</span></label>
           <button type="button" className="reader-use" disabled={!canUse} onClick={() => { if (canUse) onUse(parsed, reviewText); }}>{copy("确认并带入询价", "Use in quote")}</button>
           <p className="reader-footnote">{copy("这里只填写询价资料，不会获取价格或创建运单。", "This fills the quote form. It does not request rates or create a shipment.")}</p>

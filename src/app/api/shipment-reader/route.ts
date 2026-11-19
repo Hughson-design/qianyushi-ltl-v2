@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAppSession } from "@/lib/auth-server";
+import { xlsxSheetText } from "@/lib/xlsx-sheet-text";
 import { READER_MAX_BYTES, READER_MAX_FILES, READER_MAX_TEXT, READER_MIME, readerExtension, readerInstructions, readerResult, readerSchema } from "@/lib/shipment-reader";
 
 export const runtime = "nodejs";
@@ -38,8 +39,15 @@ export async function POST(request: Request) {
       if (!file.size || !READER_MIME[readerExtension(file.name)]) return json({ error: "文件为空或格式不支持，请使用图片、PDF、Word、Excel 或文本文件。" }, 400);
     }
     const binaryFiles: File[] = [];
+    let hasWorkbook = false;
     for (const file of files) {
       if (["txt", "csv", "tsv"].includes(readerExtension(file.name))) text += `\n${await file.text()}`;
+      else if (readerExtension(file.name) === "xlsx") {
+        if (!useAi) return json({ error: "Excel 需要勾选 AI 识别。" }, 400);
+        try { text += `\nEXCEL CELL DATA (column numbers match the header row; blank merged cells are not new shipments):\n${await xlsxSheetText(Buffer.from(await file.arrayBuffer()))}`; }
+        catch { return json({ error: "无法读取 Excel 单元格，请使用未加密的 .xlsx 文件，或截取一票货物后重试。" }, 400); }
+        hasWorkbook = true;
+      }
       else binaryFiles.push(file);
     }
     if (text.length > READER_MAX_TEXT) return json({ error: "文件文字过多，请截取一票货物的内容后提交。" }, 413);
@@ -85,8 +93,8 @@ export async function POST(request: Request) {
     const decoded = JSON.parse(output.filter((part: { type?: string }) => part.type === "output_text").map((part: { text?: string }) => part.text ?? "").join(""));
     if (typeof decoded.shipmentText !== "string" || typeof decoded.originalText !== "string" || !Array.isArray(decoded.warnings) || decoded.warnings.length > 100 || decoded.warnings.some((value: unknown) => typeof value !== "string" || value.length > 2000)) throw new Error("Invalid recognition result");
     const warnings: string[] = [...decoded.warnings];
-    if (binaryFiles.some((file) => ["xls", "xlsx"].includes(readerExtension(file.name)))) warnings.push("Excel 每个工作表最多识别前 1,000 行；请只上传一票货物的资料，并核对是否遗漏。" );
-    if (binaryFiles.some((file) => ["doc", "docx", "xls", "xlsx"].includes(readerExtension(file.name)))) warnings.push("Word / Excel 中的嵌入图片不参与文字识别；如有图片资料，请另传截图或转成 PDF。");
+    if (hasWorkbook || binaryFiles.some((file) => readerExtension(file.name) === "xls")) warnings.push("Excel 按单元格读取，每个工作表最多识别前 1,000 行；请核对每行货物与合计重量。" );
+    if (hasWorkbook || binaryFiles.some((file) => ["doc", "docx", "xls"].includes(readerExtension(file.name)))) warnings.push("Word / Excel 中的嵌入图片不参与文字识别；如有图片资料，请另传截图或转成 PDF。");
     return json(readerResult(decoded.shipmentText, decoded.originalText, warnings, "ai"));
   } catch (error) {
     if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) return json({ error: "识别超时，请减少文件数量或页数后重试。" }, 504);
