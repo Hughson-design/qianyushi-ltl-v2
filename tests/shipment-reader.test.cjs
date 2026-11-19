@@ -15,7 +15,7 @@ function harness({ signedIn = true, key = '', payload, status = 200 } = {}) {
   const requests = [];
   const route = load('src/app/api/shipment-reader/route.ts', ['GET', 'POST'], {
     ...reader,
-    xlsxSheetText: async () => 'Worksheet: Freight\nRow 1: [[1,"重量(KG)"],[2,"长(cm)"]]\nRow 2: [[1,100],[2,108]]',
+    xlsxSheetText: async () => ({ text: 'Worksheet: Freight\nRow 1: [[1,"重量(KG)"],[2,"长(cm)"]]\nRow 2: [[1,100],[2,108]]', freight: 'quantity: 1, Crate, 1 pieces, 108×65×69 cm, 100 kg, commodity: Screen\nquantity: 4, Crate, 4 pieces, 105×59×68 cm, 109 kg, commodity: Screen' }),
     NextResponse: { json: (body, options) => Response.json(body, options) },
     requireAppSession: async () => signedIn ? { session: { userId: 'test-user', customerId: 'test-customer' } } : { response: Response.json({ error: 'Sign in' }, { status: 401 }) },
     process: { env: { OPENAI_API_KEY: key } },
@@ -80,5 +80,15 @@ test('rejects incomplete/refused AI responses and throttles repeated paid reques
   for (let i = 0; i < 6; i++) assert.equal((await app.POST(app.request({ ai: true }))).status, 200);
   assert.equal((await app.POST(app.request({ ai: true }))).status, 429);
   assert.equal(app.requests.length, 6);
+});
+test('uses verified workbook cargo instead of AI duplicating the shipment total as first group quantity', async () => {
+  const app = harness({ key: 'test' });
+  const response = await app.POST(app.request({ ai: true, value: '', files: [new File(['fixture'], 'shipment.xlsx')] }));
+  const result = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(result.parsed.items.length, 2);
+  assert.equal(result.parsed.items[0].pallets, '1');
+  assert.equal(result.parsed.items[1].pallets, '4');
+  assert.equal(result.parsed.items[0].packaging, 'Crate');
 });
 

@@ -6,7 +6,7 @@ const { stripTypeScriptTypes, createRequire } = require('node:module');
 const readExcelFile = require('read-excel-file/node').default;
 const { zipSync, strToU8 } = createRequire(require.resolve('read-excel-file/node'))('fflate');
 const source = stripTypeScriptTypes(fs.readFileSync('src/lib/xlsx-sheet-text.ts', 'utf8').replace(/^import .*;\r?\n/gm, '')).replace(/\bexport /g, '');
-const { xlsxSheetText } = vm.runInNewContext(source + '\n;({xlsxSheetText})', { readExcelFile, Buffer, Date });
+const { xlsxSheetText, verifiedWorkbookFreight } = vm.runInNewContext(source + '\n;({xlsxSheetText,verifiedWorkbookFreight})', { readExcelFile, Buffer, Date });
 function workbook() {
   const xml = (text) => strToU8(text);
   return Buffer.from(zipSync({
@@ -17,11 +17,27 @@ function workbook() {
   }));
 }
 test('reads header units, sparse continuation rows and shared totals without dropping dimensions', async () => {
-  const text = await xlsxSheetText(workbook());
+  const { text } = await xlsxSheetText(workbook());
   assert.match(text, /长\(cm\)/); assert.match(text, /总重量\(KG\)/);
   assert.match(text, /\[1,536\]/); assert.match(text, /\[2,100\]/);
   assert.equal((text.match(/\[2,109\]/g) || []).length, 2);
   assert.match(text, /Row 4:.*\[3,105\]/);
+});
+test('reconciles five handling units to 536 kg and produces groups of 1 and 4, not 5 and 4', () => {
+  const rows = [
+    ['单号', '托盘序号', '每个托盘件数', '总重量（KG）', '重量（KG）', '长(cm)', '宽(cm)', '高(cm)', '品名', '备注'],
+    ['sample', '1/5', 1, 536, 100, 108, 65, 69, 'Screen', '5个木箱'],
+    ...Array.from({ length: 4 }, (_, i) => [null, `${i + 2}/5`, 1, null, 109, 105, 59, 68]),
+  ];
+  const text = verifiedWorkbookFreight(rows);
+  assert.match(text, /^quantity: 1, Crate, 1 pieces/);
+  assert.match(text, /quantity: 4, Crate, 4 pieces/);
+  assert.match(text, /108×65×69 cm, weight: 100 kg/);
+  assert.match(text, /105×59×68 cm, weight: 109 kg/);
+  rows[1][3] = 999;
+  assert.equal(verifiedWorkbookFreight(rows), null, 'conflicting totals must not be silently overridden');
+  rows[1][3] = 536; rows[0][5] = '长';
+  assert.equal(verifiedWorkbookFreight(rows), null, 'unknown units require confirmation');
 });
 test('rejects corrupt and excessively expanded archives before parsing', async () => {
   await assert.rejects(xlsxSheetText(Buffer.from('broken')));

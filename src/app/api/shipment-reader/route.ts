@@ -40,11 +40,16 @@ export async function POST(request: Request) {
     }
     const binaryFiles: File[] = [];
     let hasWorkbook = false;
+    let verifiedFreight: string | null = null;
     for (const file of files) {
       if (["txt", "csv", "tsv"].includes(readerExtension(file.name))) text += `\n${await file.text()}`;
       else if (readerExtension(file.name) === "xlsx") {
         if (!useAi) return json({ error: "Excel 需要勾选 AI 识别。" }, 400);
-        try { text += `\nEXCEL CELL DATA (column numbers match the header row; blank merged cells are not new shipments):\n${await xlsxSheetText(Buffer.from(await file.arrayBuffer()))}`; }
+        try {
+          const workbook = await xlsxSheetText(Buffer.from(await file.arrayBuffer()));
+          text += `\nEXCEL CELL DATA (column numbers match the header row; blank merged cells are not new shipments):\n${workbook.text}`;
+          if (files.length === 1 && !String(rawText ?? "").trim()) verifiedFreight = workbook.freight;
+        }
         catch { return json({ error: "无法读取 Excel 单元格，请使用未加密的 .xlsx 文件，或截取一票货物后重试。" }, 400); }
         hasWorkbook = true;
       }
@@ -95,7 +100,12 @@ export async function POST(request: Request) {
     const warnings: string[] = [...decoded.warnings];
     if (hasWorkbook || binaryFiles.some((file) => readerExtension(file.name) === "xls")) warnings.push("Excel 按单元格读取，每个工作表最多识别前 1,000 行；请核对每行货物与合计重量。" );
     if (hasWorkbook || binaryFiles.some((file) => ["doc", "docx", "xls"].includes(readerExtension(file.name)))) warnings.push("Word / Excel 中的嵌入图片不参与文字识别；如有图片资料，请另传截图或转成 PDF。");
-    return json(readerResult(decoded.shipmentText, decoded.originalText, warnings, "ai"));
+    let shipmentText = decoded.shipmentText;
+    if (verifiedFreight && /^提货地址：[^\n]+\n收货地址：[^\n]+(?:\n|$)/.test(shipmentText)) {
+      shipmentText = [...shipmentText.split(/\r?\n/).slice(0, 2), verifiedFreight].join("\n");
+      warnings.push("货物数量、尺寸和重量已按 Excel 明细单元格计算，并与整票总重量核对一致；请确认包装及地址服务要求。");
+    }
+    return json(readerResult(shipmentText, decoded.originalText, warnings, "ai"));
   } catch (error) {
     if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) return json({ error: "识别超时，请减少文件数量或页数后重试。" }, 504);
     return json({ error: "识别失败，请检查文件是否损坏、加密或内容过多，然后重试。" }, 400);
