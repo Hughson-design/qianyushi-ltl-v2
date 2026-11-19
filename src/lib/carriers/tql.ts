@@ -20,44 +20,56 @@ const accessorialCodes: Record<string, string> = {
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
-function configuration() {
-  const authUrl = process.env.TQL_AUTH_URL;
-  const apiBase = process.env.TQL_API_BASE;
-  const subscriptionKey = process.env.TQL_SUBSCRIPTION_KEY;
-  const clientId = process.env.TQL_CLIENT_ID;
-  const clientSecret = process.env.TQL_CLIENT_SECRET;
-  const username = process.env.TQL_USERNAME;
-  const password = process.env.TQL_PASSWORD;
-  const scope = process.env.TQL_SCOPE;
-  if (!authUrl || !apiBase || !subscriptionKey || !clientId || !clientSecret || !username || !password || !scope) {
-    throw new Error("TQL API is not configured.");
-  }
-  return { authUrl, apiBase: apiBase.replace(/\/$/, ""), subscriptionKey, clientId, clientSecret, username, password, scope };
+export function tqlConnectionStatus() {
+  const mode = process.env.TQL_AUTH_MODE?.trim() || (process.env.TQL_CLIENT_SECRET?.trim() ? "legacy" : "public");
+  if (!["public", "legacy"].includes(mode)) throw new Error("TQL_AUTH_MODE must be public or legacy.");
+  const required = ["TQL_SUBSCRIPTION_KEY", "TQL_CLIENT_ID", "TQL_USERNAME", "TQL_PASSWORD", "TQL_SCOPE"];
+  if (mode === "legacy") required.push("TQL_CLIENT_SECRET");
+  return { mode, missing: required.filter((name) => !process.env[name]?.trim()) };
 }
 
-async function getToken() {
-  if (cachedToken && cachedToken.expiresAt > Date.now() + 30_000) return cachedToken.value;
+function configuration() {
+  const status = tqlConnectionStatus();
+  if (status.missing.length) throw new Error(`TQL API is not configured: ${status.missing.join(", ")}.`);
+  const authUrl = process.env.TQL_AUTH_URL?.trim() || "https://public.api.tql.com/identity/token";
+  const apiBase = process.env.TQL_API_BASE?.trim() || "https://public.api.tql.com/ltl";
+  for (const endpoint of [authUrl, apiBase]) {
+    const url = new URL(endpoint);
+    if (url.origin !== "https://public.api.tql.com" || url.username || url.password || url.search || url.hash) throw new Error("Use the HTTPS public.api.tql.com endpoints supplied by TQL.");
+  }
+  return { authUrl, apiBase: apiBase.replace(/\/$/, ""), mode: status.mode,
+    subscriptionKey: process.env.TQL_SUBSCRIPTION_KEY!.trim(), clientId: process.env.TQL_CLIENT_ID!.trim(),
+    clientSecret: process.env.TQL_CLIENT_SECRET?.trim(), username: process.env.TQL_USERNAME!.trim(),
+    password: process.env.TQL_PASSWORD!, scope: process.env.TQL_SCOPE!.trim() };
+}
+
+async function getToken(force = false) {
+  if (!force && cachedToken && cachedToken.expiresAt > Date.now() + 30_000) return cachedToken.value;
   const config = configuration();
+  const body = new URLSearchParams({ client_id: config.clientId, scope: config.scope,
+    grant_type: "password", username: config.username, password: config.password });
+  if (config.mode === "legacy") body.set("client_secret", config.clientSecret!);
   const response = await fetch(config.authUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       "Ocp-Apim-Subscription-Key": config.subscriptionKey,
     },
-    body: new URLSearchParams({
-      client_id: config.clientId,
-      client_secret: config.clientSecret,
-      scope: config.scope,
-      grant_type: "password",
-      username: config.username,
-      password: config.password,
-    }),
+    body,
     cache: "no-store",
+    signal: AbortSignal.timeout(20_000),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.access_token) throw new Error(tqlError(data, response.status, "authentication"));
-  cachedToken = { value: String(data.access_token), expiresAt: Date.now() + Number(data.expires_in || 3600) * 1000 };
+  // Never expose identity-provider responses: they may echo submitted credentials.
+  if (!response.ok || typeof data.access_token !== "string" || !data.access_token.trim()) throw new Error(`TQL authentication returned HTTP ${response.status}. Check the subscription key, TRAX login, scopes and authentication mode.`);
+  const expires = Number(data.expires_in);
+  cachedToken = { value: data.access_token, expiresAt: Date.now() + (Number.isFinite(expires) && expires > 0 ? Math.min(expires, 3600) : 3600) * 1000 };
   return cachedToken.value;
+}
+
+export async function testTqlAuthentication() {
+  await getToken(true);
+  return { authenticated: true, mode: tqlConnectionStatus().mode };
 }
 
 async function headers() {
