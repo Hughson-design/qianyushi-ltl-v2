@@ -13,7 +13,7 @@
 
 在 Vercel 项目的 Environment Variables 中，添加服务器变量 `OPENAI_API_KEY`，只选择所需部署环境。不要使用 `NEXT_PUBLIC_` 前缀，不要把密钥提交 GitHub。保存后重新部署。
 
-可选变量 `OPENAI_SHIPMENT_READER_MODEL` 默认 `gpt-6.1-terra`，需选用支持图片输入和 Structured Outputs 的 Responses API 模型。ChatGPT 订阅与 API 使用是独立计费的；应在 OpenAI 项目中设置使用预算和告警。服务未配置时页面明确提示，普通文字解析仍可使用。
+可选变量 `OPENAI_SHIPMENT_READER_MODEL` 默认 `gpt-6-luna`，需选用支持图片输入和 Structured Outputs 的 Responses API 模型。若 Vercel 已设置此变量，其值会覆盖代码默认值。ChatGPT 订阅与 API 使用是独立计费的；符合条件的订阅可领取 API 抵用额度，具体资格和余额以 OpenAI 账单页面为准。应在 OpenAI 项目中设置使用预算和告警。服务未配置时页面明确提示，普通文字解析仍可使用。
 
 ## 限制与数据处理
 
