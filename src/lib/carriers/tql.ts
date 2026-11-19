@@ -59,11 +59,23 @@ async function getToken(force = false) {
     cache: "no-store",
     signal: AbortSignal.timeout(20_000),
   });
-  const data = await response.json().catch(() => ({}));
-  // Never expose identity-provider responses: they may echo submitted credentials.
-  if (!response.ok || typeof data.access_token !== "string" || !data.access_token.trim()) throw new Error(`TQL authentication returned HTTP ${response.status}. Check the subscription key, TRAX login, scopes and authentication mode.`);
-  const expires = Number(data.expires_in);
-  cachedToken = { value: data.access_token, expiresAt: Date.now() + (Number.isFinite(expires) && expires > 0 ? Math.min(expires, 3600) : 3600) * 1000 };
+  const data: unknown = await response.json().catch(() => null);
+  const root = data && typeof data === "object" && !Array.isArray(data) ? data as Record<string, unknown> : {};
+  const envelopes = [root, root.content, root.data].filter((value): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value));
+  let token = "", expires = 3600;
+  for (const envelope of envelopes) {
+    const candidate = envelope.access_token ?? envelope.accessToken ?? envelope.token;
+    if (typeof candidate === "string" && candidate.trim()) {
+      token = candidate.trim(); expires = Number(envelope.expires_in ?? envelope.expiresIn ?? 3600); break;
+    }
+  }
+  // Return field names only, never values: identity-provider errors can echo credentials.
+  if (!response.ok || !token) {
+    const names = (record: Record<string, unknown>) => Object.keys(record).filter((key) => /^[a-zA-Z_][a-zA-Z0-9_]{0,39}$/.test(key)).slice(0, 12).join(", ") || "none";
+    const shape = envelopes.map((envelope, index) => `${index === 0 ? "root" : "envelope"}: ${names(envelope)}`).join("; ");
+    throw new Error(`TQL authentication returned HTTP ${response.status}. Response fields (${shape}). Check the subscription key, TRAX login, scopes and authentication mode.`);
+  }
+  cachedToken = { value: token, expiresAt: Date.now() + (Number.isFinite(expires) && expires > 0 ? Math.min(expires, 3600) : 3600) * 1000 };
   return cachedToken.value;
 }
 

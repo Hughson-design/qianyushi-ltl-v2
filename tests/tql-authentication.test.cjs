@@ -39,6 +39,15 @@ test('legacy clients retain their independently supplied secret', async () => {
   assert.equal((await api.testTqlAuthentication()).mode, 'legacy');
   assert.equal(api.calls[0].init.body.get('client_secret'), 'legacy-secret');
 });
+test('accepts camel-case token fields and JSON envelopes without exposing token values', async () => {
+  for (const payload of [{ accessToken: 'fixture-token', expiresIn: 1800 }, { content: { access_token: 'fixture-token' } }, { data: { token: 'fixture-token' } }]) {
+    const api = carrier({ TQL_AUTH_MODE: 'public' }, payload);
+    assert.equal((await api.testTqlAuthentication()).authenticated, true);
+    assert.equal(await api.getToken(), 'fixture-token');
+  }
+  const error = carrier({}, { content: { error_description: 'fixture-password' } });
+  await assert.rejects(error.testTqlAuthentication(), (failure) => /root: content/.test(failure.message) && /error_description/.test(failure.message) && !/fixture-password/.test(failure.message));
+});
 test('missing credentials, invalid mode and non-TQL destinations fail before transmitting credentials', async () => {
   for (const env of [{ TQL_PASSWORD: '' }, { TQL_AUTH_MODE: 'unknown' }, { TQL_AUTH_URL: 'https://other.example/token' }]) {
     const api = carrier(env); await assert.rejects(api.testTqlAuthentication()); assert.equal(api.calls.length, 0);
