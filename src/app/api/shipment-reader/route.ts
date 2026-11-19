@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: process.env.OPENAI_SHIPMENT_READER_MODEL?.trim() || "gpt-6-luna",
+        model: process.env.OPENAI_SHIPMENT_READER_MODEL?.trim() || "gpt-5.4-mini",
         store: false,
         instructions: readerInstructions,
         input: [{ role: "user", content }],

@@ -62,7 +62,7 @@ test('sends images and supported document types to Responses only with explicit 
   const result = await response.json(); assert.equal(result.parsed.items[0].pieces, '7');
   assert.ok(result.warnings.some((warning) => warning.includes('1,000')));
   const sent = app.requests[0]; assert.equal(sent.url, 'https://api.openai.com/v1/responses');
-  assert.equal(sent.body.model, 'gpt-6-luna');
+  assert.equal(sent.body.model, 'gpt-5.4-mini');
   assert.equal(sent.body.store, false); assert.equal(sent.body.text.format.strict, true);
   assert.equal(sent.body.input[0].content.filter((part) => part.type === 'input_image').length, 1);
   assert.equal(sent.body.input[0].content.filter((part) => part.type === 'input_file').length, 4);
