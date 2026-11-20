@@ -9,7 +9,7 @@ function load(path, names, globals = {}) {
   return vm.runInNewContext(source + '\n;({' + names.join(',') + '})', { console, Buffer, File, Request, Response, FormData, AbortSignal, URL, ...globals });
 }
 const parser = load('src/lib/smart-quote-parser.ts', ['parseSmartQuote']);
-const reader = load('src/lib/shipment-reader.ts', ['readerResult', 'readerExtension', 'readerInstructions', 'readerSchema', 'READER_MAX_BYTES', 'READER_MAX_FILES', 'READER_MAX_TEXT', 'READER_MIME'], parser);
+const reader = load('src/lib/shipment-reader.ts', ['readerResult', 'READER_MODEL', 'readerExtension', 'readerInstructions', 'readerSchema', 'READER_MAX_BYTES', 'READER_MAX_FILES', 'READER_MAX_TEXT', 'READER_MIME'], parser);
 const text = '提货地址：91789\n收货地址：1251 E Walnut, Carson, CA 90746\n7 pallets, 7 pieces, 120*100*180 cm, 744 kg, commodity: Furniture';
 test('dimensions and weights round upward after unit conversion and total-weight allocation', () => {
   const route = '提货地址：90670\n收货地址：32811\n';
@@ -43,22 +43,26 @@ test('private address means residential, preserving separately stated delivery s
   assert.equal(pickup.hasDeclaredDeliveryType, false);
   assert.match(reader.readerInstructions, /私人地址.*explicit residential/);
 });
-function harness({ signedIn = true, key = '', payload, status = 200 } = {}) {
-  const requests = [];
+function harness({ signedIn = true, key = '', payload, status = 200, blocked = false, allowed = true, budgetDown = false, countFails = false, networkFails = false } = {}) {
+  const requests = [], counts = [], settlements = [], reservations = [];
+  const quota = { day: "2026-11-20", used: 0, reserved: 0, limit: 200000, remaining: blocked ? 0 : 200000, blocked, resetAt: "2026-11-21T00:00:00Z" };
   const route = load('src/app/api/shipment-reader/route.ts', ['GET', 'POST'], {
     ...reader,
+    getReaderQuota: async () => { if (budgetDown) throw Error("Unavailable"); return quota; },
+    reserveReaderTokens: async tokens => { reservations.push(tokens); return { allowed, id: allowed ? "fixture-reservation" : undefined, quota }; },
+    settleReaderTokens: async (id, actual, block) => { settlements.push({ id, actual, block }); return { ...quota, blocked: Boolean(block) }; },
     xlsxSheetText: async () => ({ text: 'Worksheet: Freight\nRow 1: [[1,"重量(KG)"],[2,"长(cm)"]]\nRow 2: [[1,100],[2,108]]', freight: 'quantity: 1, Crate, 1 pieces, 108×65×69 cm, 100 kg, commodity: Screen\nquantity: 4, Crate, 4 pieces, 105×59×68 cm, 109 kg, commodity: Screen' }),
     NextResponse: { json: (body, options) => Response.json(body, options) },
     requireAppSession: async () => signedIn ? { session: { userId: 'test-user', customerId: 'test-customer' } } : { response: Response.json({ error: 'Sign in' }, { status: 401 }) },
     process: { env: { OPENAI_API_KEY: key } },
-    fetch: async (url, init) => { requests.push({ url, body: JSON.parse(init.body) }); return Response.json(payload ?? { status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify({ shipmentText: text, originalText: text, warnings: ['请核对托数和重量'] }) }] }] }, { status }); },
+    fetch: async (url, init) => { if (url.endsWith('/input_tokens')) { counts.push(JSON.parse(init.body)); return countFails ? Response.json({}, { status: 500 }) : Response.json({ input_tokens: 1000 }); } requests.push({ url, body: JSON.parse(init.body) }); if (networkFails) throw Error('Network failed'); return Response.json(payload ?? { status: 'completed', usage: { total_tokens: 1250 }, output: [{ content: [{ type: 'output_text', text: JSON.stringify({ shipmentText: text, originalText: text, warnings: ['请核对托数和重量'] }) }] }] }, { status }); },
   });
   function request({ ai = false, files = [], value = text, headers = {} } = {}) {
     const body = new FormData(); body.set('text', value); body.set('useAi', String(ai));
     for (const file of files) body.append('files', file);
     return new Request('https://ltl.example/api/shipment-reader', { method: 'POST', body, headers });
   }
-  return { ...route, requests, request };
+  return { ...route, requests, counts, settlements, reservations, request };
 }
 
 test('requires authentication before reading uploads or revealing AI status', async () => {
@@ -95,7 +99,11 @@ test('sends images and supported document types to Responses only with explicit 
   const result = await response.json(); assert.equal(result.parsed.items[0].pieces, '7');
   assert.ok(result.warnings.some((warning) => warning.includes('1,000')));
   const sent = app.requests[0]; assert.equal(sent.url, 'https://api.openai.com/v1/responses');
-  assert.equal(sent.body.model, 'gpt-5.4-mini');
+  assert.equal(sent.body.model, 'gpt-6-luna');
+  assert.equal(app.counts[0].model, 'gpt-6-luna');
+  assert.equal(JSON.stringify(app.counts[0].input), JSON.stringify(sent.body.input));
+  assert.deepEqual(app.reservations, [7512]);
+  assert.equal(app.settlements[0].actual, 1250);
   assert.equal(sent.body.store, false); assert.equal(sent.body.text.format.strict, true);
   assert.equal(sent.body.input[0].content.filter((part) => part.type === 'input_image').length, 1);
   assert.equal(sent.body.input[0].content.filter((part) => part.type === 'input_file').length, 3);
@@ -122,4 +130,29 @@ test('uses verified workbook cargo instead of AI duplicating the shipment total 
   assert.equal(result.parsed.items[0].pallets, '1');
   assert.equal(result.parsed.items[1].pallets, '4');
   assert.equal(result.parsed.items[0].packaging, 'Crate');
+});
+
+test('daily cap or missing durable budget stops inference before spending tokens', async () => {
+  for (const options of [{ blocked: true }, { budgetDown: true }, { allowed: false }, { countFails: true }]) {
+    const app = harness({ key: 'test', ...options });
+    const response = await app.POST(app.request({ ai: true }));
+    assert.ok([402, 503].includes(response.status)); assert.equal(app.requests.length, 0);
+    if (options.blocked || options.budgetDown) assert.equal(app.counts.length, 0);
+    if (options.allowed === false) assert.equal((await response.json()).code, 'AI_DAILY_LIMIT');
+  }
+});
+test('provider billing limit is visibly distinct from temporary rate limiting, without model fallback', async () => {
+  const exhausted = harness({ key: 'test', status: 429, payload: { error: { code: 'insufficient_quota' } } });
+  const response = await exhausted.POST(exhausted.request({ ai: true }));
+  assert.equal(response.status, 402); assert.equal((await response.json()).code, 'AI_PROVIDER_QUOTA_EXHAUSTED');
+  assert.equal(exhausted.settlements[0].block, true); assert.equal(exhausted.requests.length, 1);
+  const busy = harness({ key: 'test', status: 429, payload: { error: { code: 'rate_limit_exceeded' } } });
+  const retry = await busy.POST(busy.request({ ai: true }));
+  assert.equal(retry.status, 429); assert.equal((await retry.json()).code, 'AI_RATE_LIMIT');
+  assert.equal(busy.settlements[0].block, false);
+});
+test('uncertain network results conservatively consume the full reservation', async () => {
+  const app = harness({ key: 'test', networkFails: true });
+  assert.ok((await app.POST(app.request({ ai: true }))).status >= 400);
+  assert.equal(app.settlements.length, 1); assert.equal(app.settlements[0].actual, null);
 });

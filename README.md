@@ -120,6 +120,7 @@ pnpm start
 17. `outputs/supabase-enable-mothership-settings.sql`
 18. `outputs/supabase-fix-booking-attempt-ledger.sql`
 19. `outputs/supabase-security-hardening.sql`
+20. `outputs/supabase-enable-ai-budget.sql`
 
 这些脚本使用 `IF NOT EXISTS` 或兼容性修改为主，但生产环境执行前仍应备份数据库。完整说明见 [Supabase 部署说明](docs/SUPABASE-SETUP.md)。
 
@@ -192,3 +193,5 @@ pnpm start
 TQL 当前没有提供取消 API。TQL 运单必须先联系 TQL 人工取消，系统不会在承运商取消前自动退款。
 
 安全状态机、待核对运单操作及数据库验证见 [安全修复说明](docs/SECURITY-HARDENING.md)。
+
+资料识别使用 GPT-6 Luna；每日保护额度、超额暂停及提示见 [资料识别说明](docs/SHIPMENT-READER.md)。

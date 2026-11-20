@@ -1,6 +1,7 @@
 import { parseSmartQuote, type SmartQuoteResult } from "./smart-quote-parser";
 
 export const READER_MAX_FILES = 5;
+export const READER_MODEL = "gpt-6-luna";
 export const READER_MAX_BYTES = 2_500_000;
 export const READER_MAX_TEXT = 25_000;
 export const READER_ACCEPT = ".png,.jpg,.jpeg,.webp,.pdf,.xlsx,.xls,.docx,.doc,.txt,.csv,.tsv";

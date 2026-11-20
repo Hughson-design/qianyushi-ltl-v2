@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAppSession } from "@/lib/auth-server";
 import { xlsxSheetText } from "@/lib/xlsx-sheet-text";
-import { READER_MAX_BYTES, READER_MAX_FILES, READER_MAX_TEXT, READER_MIME, readerExtension, readerInstructions, readerResult, readerSchema } from "@/lib/shipment-reader";
+import { READER_MODEL, READER_MAX_BYTES, READER_MAX_FILES, READER_MAX_TEXT, READER_MIME, readerExtension, readerInstructions, readerResult, readerSchema } from "@/lib/shipment-reader";
+import { getReaderQuota, reserveReaderTokens, settleReaderTokens } from "@/lib/ai-budget";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -13,10 +14,14 @@ const json = (body: object, status = 200) => NextResponse.json(body, { status, h
 export async function GET() {
   const auth = await requireAppSession();
   if (auth.response || !auth.session) return auth.response;
-  return json({ aiAvailable: Boolean(process.env.OPENAI_API_KEY?.trim()), maxBytes: READER_MAX_BYTES, maxFiles: READER_MAX_FILES });
+  const aiAvailable = Boolean(process.env.OPENAI_API_KEY?.trim());
+  try { return json({ aiAvailable, model: READER_MODEL, quota: aiAvailable ? await getReaderQuota() : null, maxBytes: READER_MAX_BYTES, maxFiles: READER_MAX_FILES }); }
+  catch { return json({ aiAvailable, model: READER_MODEL, quotaUnavailable: true, maxBytes: READER_MAX_BYTES, maxFiles: READER_MAX_FILES }); }
 }
 
 export async function POST(request: Request) {
+  let reservationId: string | null = null;
+  let settled = false;
   try {
     const auth = await requireAppSession();
     if (auth.response || !auth.session) return auth.response;
@@ -62,6 +67,10 @@ export async function POST(request: Request) {
     }
     const apiKey = process.env.OPENAI_API_KEY?.trim();
     if (!apiKey) return json({ error: "AI 识别尚未启用，请由管理员配置 OPENAI_API_KEY。文字可先使用普通解析。" }, 503);
+    try {
+      const quota = await getReaderQuota();
+      if (quota.blocked || quota.remaining < 6512) return json({ code: "AI_DAILY_LIMIT", quota, error: "今日 AI 保护额度已用完或余量不足，已暂停 AI 识别，不会自动转为付费。可在每日 UTC 00:00 重置后再试，或取消勾选 AI 使用普通文字解析。" }, 402);
+    } catch { return json({ code: "AI_BUDGET_UNAVAILABLE", error: "AI 用量保护暂不可用，已停止发送识别请求。请联系管理员检查数据库。" }, 503); }
     // Best-effort per-instance throttling; account-level budgets should also be set at the API provider.
     const identity = String(auth.session.userId);
     const now = Date.now();
@@ -77,21 +86,40 @@ export async function POST(request: Request) {
       content.push(mime.startsWith("image/") ? { type: "input_image", image_url: data, detail: "high" }
         : { type: "input_file", filename: file.name.replace(/[^\w.\-]/g, "_").slice(-100), file_data: data });
     }
+    const aiRequest = {
+      model: READER_MODEL,
+      instructions: readerInstructions,
+      input: [{ role: "user", content }],
+      reasoning: { effort: "low" },
+      text: { format: { type: "json_schema", name: "shipment_extraction", strict: true, schema: readerSchema } },
+    };
+    // Count the exact same input/schema, then atomically reserve input + maximum output.
+    const countResponse = await fetch("https://api.openai.com/v1/responses/input_tokens", {
+      method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(aiRequest), signal: AbortSignal.timeout(15_000),
+    });
+    const count = await countResponse.json().catch(() => null);
+    if (!countResponse.ok && ["insufficient_quota", "billing_hard_limit_reached", "billing_not_active", "usage_limit_reached"].includes(String(count?.error?.code || count?.error?.type || ""))) return json({ code: "AI_PROVIDER_QUOTA_EXHAUSTED", error: "OpenAI 账户额度不足或已达到消费上限，已停止 AI 识别，请联系管理员。" }, 402);
+    if (!countResponse.ok || !Number.isSafeInteger(count?.input_tokens) || count.input_tokens < 0) return json({ code: "AI_COUNT_UNAVAILABLE", error: "无法安全计算本次用量，已停止 AI 识别。请稍后重试或联系管理员检查模型权限。" }, 503);
+    let reservation;
+    try { reservation = await reserveReaderTokens(count.input_tokens + 6000 + 512); }
+    catch { return json({ code: "AI_BUDGET_UNAVAILABLE", error: "AI 用量保护暂不可用，未发送识别请求。" }, 503); }
+    if (!reservation.allowed || !reservation.id) return json({ code: "AI_DAILY_LIMIT", quota: reservation.quota, error: "本次资料预计用量超过今日剩余保护额度，已停止发送，不会自动转为付费。请在 UTC 00:00 重置后再试，或减少资料。" }, 402);
+    reservationId = reservation.id;
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: process.env.OPENAI_SHIPMENT_READER_MODEL?.trim() || "gpt-5.4-mini",
-        store: false,
-        instructions: readerInstructions,
-        input: [{ role: "user", content }],
-        max_output_tokens: 6000,
-        text: { format: { type: "json_schema", name: "shipment_extraction", strict: true, schema: readerSchema } },
-      }),
-      signal: AbortSignal.timeout(50_000),
+      body: JSON.stringify({ ...aiRequest, store: false, max_output_tokens: 6000 }),
+      signal: AbortSignal.timeout(35_000),
     });
-    if (!response.ok) return json({ error: response.status === 429 ? "AI 服务额度不足或繁忙，请联系管理员或稍后重试。" : "AI 服务未能识别资料，请检查服务配置或更换清晰文件。" }, 502);
-    const payload = await response.json();
+    const payload = await response.json().catch(() => null);
+    const quotaExceeded = ["insufficient_quota", "billing_hard_limit_reached", "billing_not_active", "usage_limit_reached"].includes(String(payload?.error?.code || payload?.error?.type || ""));
+    const actual = Number.isSafeInteger(payload?.usage?.total_tokens) && payload.usage.total_tokens >= 0 ? payload.usage.total_tokens : (!response.ok && [400, 401, 403, 404, 422, 429].includes(response.status) ? 0 : null);
+    let quota;
+    try { quota = await settleReaderTokens(reservationId, actual, quotaExceeded); settled = true; }
+    catch { return json({ code: "AI_BUDGET_UNAVAILABLE", error: "本次 AI 用量暂未核对，已保留额度预留。请稍后再试，勿连续重复提交。" }, 503); }
+    if (!response.ok) return json({ code: quotaExceeded ? "AI_PROVIDER_QUOTA_EXHAUSTED" : response.status === 429 ? "AI_RATE_LIMIT" : "AI_PROVIDER_ERROR", quota, error: quotaExceeded ? "OpenAI 账户额度不足或已达到消费上限，本站今日 AI 已暂停，请联系管理员。不会自动更换付费模型。" : response.status === 429 ? "AI 服务请求过于频繁，请稍后重试；这不代表每日免费额度已用完。" : "AI 服务未能识别资料，请检查模型权限或更换清晰文件。" }, quotaExceeded ? 402 : response.status === 429 ? 429 : 502);
+    if (!payload) return json({ error: "AI 返回格式异常，额度已保守记录，请稍后再试。", quota }, 502);
     if (payload.status !== "completed") return json({ error: "识别未完成，请减少文件或页数后重试。" }, 502);
     const output = (payload.output ?? []).flatMap((item: { content?: Array<{ type?: string; text?: string }> }) => item.content ?? []);
     if (output.some((part: { type?: string }) => part.type === "refusal")) return json({ error: "该资料未能识别，请更换文件或直接粘贴货运文字。" }, 422);
@@ -105,9 +133,14 @@ export async function POST(request: Request) {
       shipmentText = [...shipmentText.split(/\r?\n/).slice(0, 2), verifiedFreight].join("\n");
       warnings.push("货物数量、尺寸和重量已按 Excel 明细单元格计算，并与整票总重量核对一致；请确认包装及地址服务要求。");
     }
-    return json(readerResult(shipmentText, decoded.originalText, warnings, "ai"));
+    return json({ ...readerResult(shipmentText, decoded.originalText, warnings, "ai"), model: READER_MODEL, quota });
   } catch (error) {
     if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) return json({ error: "识别超时，请减少文件数量或页数后重试。" }, 504);
     return json({ error: "识别失败，请检查文件是否损坏、加密或内容过多，然后重试。" }, 400);
+  } finally {
+    if (reservationId && !settled) {
+      // A timeout may still be billed. Retain the full allowance, never assume zero usage.
+      try { await settleReaderTokens(reservationId, null); } catch { /* Durable reservation remains held. */ }
+    }
   }
 }

@@ -13,7 +13,7 @@
 
 在 Vercel 项目的 Environment Variables 中，添加服务器变量 `OPENAI_API_KEY`，只选择所需部署环境。不要使用 `NEXT_PUBLIC_` 前缀，不要把密钥提交 GitHub。保存后重新部署。
 
-可选变量 `OPENAI_SHIPMENT_READER_MODEL` 默认 `gpt-5.4-mini`，需选用支持图片输入和 Structured Outputs 的 Responses API 模型。若 Vercel 已设置此变量，其值会覆盖代码默认值。ChatGPT 订阅与 API 使用是独立计费的；符合条件的订阅可领取 API 抵用额度，具体资格和余额以 OpenAI 账单页面为准。应在 OpenAI 项目中设置使用预算和告警。服务未配置时页面明确提示，普通文字解析仍可使用。
+资料识别固定使用 `gpt-6-luna`，不再接受旧的模型环境变量覆盖，不会在失败后自动切换付费模型。
 
 ## 限制与数据处理
 
@@ -32,3 +32,15 @@ Excel `.xlsx` 先由服务器读取真实单元格和表头单位，再发送文
 官方接口说明：[File inputs](https://developers.openai.com/api/docs/guides/file-inputs)、[Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)。
 
 验证：`node --test tests/shipment-reader.test.cjs`，`pnpm build`。自动测试使用模拟服务，不向 OpenAI 或承运商发送真实请求。
+
+## GPT-6 Luna 用量保护（2026-11-20）
+
+先运行 `outputs/supabase-enable-ai-budget.sql`，再部署代码。已在生产库安装，并用 `outputs/verify-ai-budget.sql` 的临时表和回滚验证。
+
+本站所有客户/服务器共享每日 200,000 token 保护额度。先调用 OpenAI 免费输入计数接口，计数包含同一份 instructions、图片/文件及 JSON schema，再预留输入量 + 6,000 最大输出 + 512 安全余量。余额不足不发起推理；失败不自动更换模型。完整响应按 usage.total_tokens 结算，超时或无法确认时保守记录完整预留；重复结算不能减回额度。数据库不可用则停止 AI，普通文字解析仍可使用。
+
+页面显示模型、保护用量、预留和余量；保护额度不足、服务商账单/余额不足、临时限流分别提示。每日 UTC 00:00 重置，计数器不因部署、重启、切换设备而清零。
+
+这是本站保护计数，不是 OpenAI 组织账单。GPT-6 Luna 的 Build 共享免费组为每日 250,000 tokens，本站预留了 50,000 余量，但其他应用/模型使用同组、资格或共享设置改变仍可能造成计费，不能承诺跨应用零费用。不要把平台的普通 429 限流当成免费额度耗尽。
+
+参考：https://developers.openai.com/api/docs/guides/token-counting ，https://help.openai.com/en/articles/10306912-sharing-feedback-evaluation-and-fine-tuning-data-and-api-inputs-and-outputs-with-openai

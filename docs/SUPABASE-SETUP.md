@@ -43,6 +43,7 @@
 17. `outputs/supabase-enable-mothership-settings.sql`
 18. `outputs/supabase-fix-booking-attempt-ledger.sql`
 19. `outputs/supabase-security-hardening.sql`
+20. `outputs/supabase-enable-ai-budget.sql`
 
 为什么要按顺序：
 

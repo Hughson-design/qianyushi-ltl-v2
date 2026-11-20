@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type FormEvent } from "react";
 import { READER_ACCEPT, READER_MAX_BYTES, READER_MAX_FILES, READER_MAX_TEXT, READER_MIME, readerExtension, type ReaderResult } from "@/lib/shipment-reader";
 import { parseSmartQuote, type SmartQuoteResult, type SmartFreightItem } from "@/lib/smart-quote-parser";
+import type { ReaderQuota } from "@/lib/ai-budget";
 
 type Attachment = { id: string; file: File; url: string; preview?: string };
 type Props = { language: "zh" | "en"; onUse: (result: SmartQuoteResult, text: string) => void };
@@ -21,6 +22,9 @@ export function ShipmentReaderPanel({ language, onUse }: Props) {
   const [freightEdits, setFreightEdits] = useState<EditableFreight[]>([]);
   const [freightDirty, setFreightDirty] = useState(false);
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
+  const [quota, setQuota] = useState<ReaderQuota | null>(null);
+  const [quotaUnavailable, setQuotaUnavailable] = useState(false);
+  const [providerQuotaBlocked, setProviderQuotaBlocked] = useState(false);
   const [useAi, setUseAi] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -36,7 +40,7 @@ export function ShipmentReaderPanel({ language, onUse }: Props) {
     const controller = new AbortController();
     fetch("/api/shipment-reader", { signal: controller.signal, cache: "no-store" })
       .then(async (response) => { if (!response.ok) throw new Error(); return response.json(); })
-      .then((data) => setAiAvailable(Boolean(data.aiAvailable)))
+      .then((data) => { setAiAvailable(Boolean(data.aiAvailable)); setQuota(data.quota || null); setQuotaUnavailable(Boolean(data.quotaUnavailable)); })
       .catch(() => { if (!controller.signal.aborted) setAiAvailable(false); });
     return () => {
       controller.abort(); abort.current?.abort(); sequence.current += 1;
@@ -133,6 +137,9 @@ export function ShipmentReaderPanel({ language, onUse }: Props) {
       attachments.forEach((item) => body.append("files", item.file));
       const response = await fetch("/api/shipment-reader", { method: "POST", body, signal: controller.signal });
       const data = await response.json();
+      if (data.quota) setQuota(data.quota);
+      if (data.code === "AI_BUDGET_UNAVAILABLE") setQuotaUnavailable(true);
+      if (data.code === "AI_PROVIDER_QUOTA_EXHAUSTED") setProviderQuotaBlocked(true);
       if (!response.ok) throw new Error(response.status === 401 ? copy("登录已过期，请刷新页面重新登录。", "Your session expired. Refresh and sign in again.") : data.error || "Unable to read the shipment.");
       if (id !== sequence.current) return;
       setResult(data); setReviewText(data.text || ""); loadFreight(data.text || "");
@@ -147,6 +154,7 @@ export function ShipmentReaderPanel({ language, onUse }: Props) {
   };
   const validFreight = parsed.items.length > 0 && parsed.items.every((item) => [item.pallets, item.pieces, item.length, item.width, item.height, item.unitWeight].every((value) => Number.isFinite(Number(value)) && Number(value) > 0) && Number.isInteger(Number(item.pallets)) && Number.isInteger(Number(item.pieces)));
   const canUse = Boolean(result && reviewText.trim() && validFreight && !parsed.missing.length && reviewed && !busy && !freightDirty);
+  const quotaBlocked = quotaUnavailable || providerQuotaBlocked || Boolean(quota && (quota.blocked || quota.remaining < 6512));
   return <div className="reader-page" onPaste={paste}>
     <section className="page-heading reader-heading"><div><p className="eyebrow">SHIPMENT READER</p><h1>{copy("资料识别", "Shipment reader")}</h1><p>{copy("粘贴文字、截图或上传文件，先核对，再带入询价。", "Paste text or screenshots, or upload documents. Review before quoting.")}</p></div><span className="reader-draft-pill">{copy("仅生成草稿", "Draft only")}</span></section>
     <div className="reader-layout">
@@ -170,11 +178,19 @@ export function ShipmentReaderPanel({ language, onUse }: Props) {
           <button type="button" disabled={busy} aria-label={`${copy("移除", "Remove")} ${item.file.name}`} onClick={() => { URL.revokeObjectURL(item.url); replaceAttachments(attachments.filter((entry) => entry.id !== item.id)); invalidate(); }}>×</button>
         </li>)}</ul>}
         <div className="reader-ai-choice"><label><input type="checkbox" checked={useAi} disabled={busy || aiAvailable !== true} onChange={(event) => { setUseAi(event.target.checked); invalidate(); }} /><span><strong>{copy("使用 AI 理解资料", "Use AI extraction")}</strong><small>{copy("勾选后，所提交的文字及文件将发送给 OpenAI，按使用量计费。", "When selected, submitted text and files are sent to OpenAI and billed by usage.")}</small></span></label>
+          {aiAvailable && <div className={`reader-budget ${quotaBlocked ? "reader-budget-blocked" : ""}`} role={quotaBlocked ? "alert" : "status"}>
+            <strong>{quotaBlocked ? copy("AI 已暂停：额度不足或用量保护暂不可用", "AI paused: allowance unavailable or insufficient") : "GPT-6 Luna"}</strong>
+            {quotaBlocked && <small>{copy("恢复后请刷新页面再试。可取消勾选 AI，继续普通文字解析。", "Refresh after service or allowance is restored. Basic text parsing remains available with AI unchecked.")}</small>}
+            {quota && <p>{copy("本站今日保护额度：", "Site daily allowance: ")}{quota.limit.toLocaleString()} tokens · {copy("已计入", "Recorded")} {quota.used.toLocaleString()} · {copy("预留", "Reserved")} {quota.reserved.toLocaleString()} · {copy("剩余", "Remaining")} {quota.remaining.toLocaleString()}</p>}
+            <small>{copy("识别前核算并预留用量，余量不足不发送、不自动转付费。每日 UTC 00:00 重置。保护额度为20万 tokens，低于25万免费额度以保留安全余量。", "Usage is counted and reserved before extraction. Insufficient allowance stops the request without paid fallback. Resets at 00:00 UTC. The 200,000-token site cap leaves headroom below the 250,000-token free allowance.")}</small>
+            <small>{copy("这是本站用量，不是 OpenAI 全组织余额；其他应用使用同一免费额度组也会消耗额度。免费资格及数据共享设置须保持有效。", "This tracks this site, not organization-wide usage. Other applications share the OpenAI pool. Eligibility and data-sharing settings must remain active.")}</small>
+            <small>{copy("超时或用量未确认时按本次预留上限保守计入，避免低估；这里的计数不等于账单金额。", "Unconfirmed requests conservatively count their full reservation. These protection counters are not billing totals.")}</small>
+          </div>}
           {aiAvailable === false && <p>{copy("AI 尚未启用：请管理员配置 OPENAI_API_KEY。普通文字解析可先使用。", "AI is not enabled. Ask the administrator to configure OPENAI_API_KEY. Basic text parsing is available.")}</p>}
           {hasBinary && !useAi && <p>{copy("图片、扫描 PDF、Word 和 Excel 需要启用 AI 识别。", "Images, PDFs, Word, and Excel require AI extraction.")}</p>}
         </div>
         {error && <p className="reader-error" role="alert">{error}</p>}
-        <div className="reader-form-actions"><button type="submit" className="reader-primary" disabled={busy || (!text.trim() && !attachments.length) || (hasBinary && !useAi)}>{busy ? copy("正在识别…", "Reading…") : copy("开始识别", "Read shipment")}</button>{busy ? <button type="button" className="reader-secondary" onClick={() => { abort.current?.abort(); sequence.current += 1; setBusy(false); }}>{copy("取消", "Cancel")}</button> : <button type="button" className="reader-secondary" disabled={!text && !attachments.length && !result} onClick={() => { for (const item of attachments) URL.revokeObjectURL(item.url); replaceAttachments([]); setText(""); invalidate(); }}>{copy("清空", "Clear")}</button>}</div>
+        <div className="reader-form-actions"><button type="submit" className="reader-primary" disabled={busy || (!text.trim() && !attachments.length) || (hasBinary && !useAi) || (useAi && quotaBlocked)}>{busy ? copy("正在核算用量并识别…", "Counting usage and reading…") : copy("开始识别", "Read shipment")}</button>{busy ? <button type="button" className="reader-secondary" onClick={() => { abort.current?.abort(); sequence.current += 1; setBusy(false); }}>{copy("取消", "Cancel")}</button> : <button type="button" className="reader-secondary" disabled={!text && !attachments.length && !result} onClick={() => { for (const item of attachments) URL.revokeObjectURL(item.url); replaceAttachments([]); setText(""); invalidate(); }}>{copy("清空", "Clear")}</button>}</div>
         <p className="reader-footnote">{copy("原文件不会保存到本站数据库；只有确认后带入的询价文字会按现有询价记录规则保存。", "Original files are not saved to this site's database. Confirmed quote text follows existing quote input history rules.")}</p>
       </form>
       <section className="panel reader-output" aria-busy={busy} aria-live="polite">
