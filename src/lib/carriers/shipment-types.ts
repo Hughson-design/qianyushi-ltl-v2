@@ -33,6 +33,7 @@ export type ShipmentItem = {
 
 export type StoredQuote = {
   id: string;
+  customer_id?: string;
   quote_number: string;
   status: string;
   reference: string;

@@ -1,4 +1,5 @@
 import "server-only";
+import { beforeShipmentSubmission, NoShipmentSubmissionError, isTqlValidationRejection } from "../booking-errors";
 
 import type { NormalizedRate, QuoteRequest } from "./types";
 import type { ShipmentBookingResult, ShipmentParty, StoredQuote } from "./shipment-types";
@@ -216,7 +217,8 @@ async function getTenderedPoNumber(quoteId: number) {
   const response = await fetch(`${config.apiBase}/quotes/${quoteId}`, { headers: await headers(), cache: "no-store" });
   if (!response.ok) throw new Error("TQL existing-tender lookup failed. Verify the shipment before booking.");
   const data = await response.json();
-  if (!data?.content || typeof data.content !== "object" || Array.isArray(data.content)) throw new Error("TQL existing-tender response was invalid. Verify before booking.");
+  if (!data?.content || typeof data.content !== "object" || Array.isArray(data.content) || Number(data.content.quoteId) !== quoteId) throw new Error("TQL existing-tender response was invalid or belonged to a different quote. Verify before booking.");
+  if (!Object.hasOwn(data.content, "poNumber") || data.content.poNumber === undefined || (data.content.tenderedDate && !data.content.poNumber)) throw new Error("TQL tender status is incomplete. Keep the reservation pending for verification.");
   return data?.content?.poNumber ? String(data.content.poNumber) : null;
 }
 
@@ -228,7 +230,7 @@ export async function dispatchTqlShipment(quote: StoredQuote, reconcileOnly = fa
   const carrierPriceId = Number(quote.provider_ref.carrierPriceId);
   if (!Number.isFinite(quoteId) || !Number.isFinite(carrierPriceId)) throw new Error("The TQL quote reference is missing or expired. Request new rates.");
 
-  const existingPoNumber = await getTenderedPoNumber(quoteId);
+  const existingPoNumber = await beforeShipmentSubmission(() => getTenderedPoNumber(quoteId), "TQL lookup failed before tender; no booking request was submitted.");
   if (existingPoNumber) {
     return { shipmentId: existingPoNumber, pickupId: null, bolNumber: existingPoNumber, bolUrl: null, documentRef: "email" };
   }
@@ -237,9 +239,10 @@ export async function dispatchTqlShipment(quote: StoredQuote, reconcileOnly = fa
   const bolEmail = process.env.TQL_BOL_EMAIL || quote.sender.email || quote.receiver.email;
   if (!bolEmail) throw new Error("Add TQL_BOL_EMAIL or a sender email before generating the TQL BOL.");
   const config = configuration();
+  const tenderHeaders = await beforeShipmentSubmission(() => headers(), "TQL authentication failed before tender.");
   const response = await fetch(`${config.apiBase}/quotes/tender`, {
     method: "POST",
-    headers: await headers(),
+    headers: tenderHeaders,
     body: JSON.stringify({
       carrierPriceId,
       customerEmailAddresses: [bolEmail],
@@ -256,6 +259,12 @@ export async function dispatchTqlShipment(quote: StoredQuote, reconcileOnly = fa
     cache: "no-store",
   });
   const data = await response.json().catch(() => ({}));
+  if (isTqlValidationRejection(response.status, data)) {
+    // A bare HTTP 400 is insufficient: require structured validation errors AND
+    // another successful quote lookup with no PO. A failed lookup stays pending.
+    const afterRejection = await getTenderedPoNumber(quoteId);
+    if (!afterRejection) throw new NoShipmentSubmissionError("TQL rejected invalid booking details and a follow-up lookup found no tendered PO.", "validation_rejected");
+  }
   if (!response.ok) throw new Error(tqlError(data, response.status, "tender"));
   const bolNumber = String(data?.content?.poNumber || "");
   if (!bolNumber) throw new Error("TQL tendered the shipment but did not return a BOL number. Check the TQL portal before retrying.");

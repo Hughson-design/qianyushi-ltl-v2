@@ -1,4 +1,5 @@
 import "server-only";
+import { beforeShipmentSubmission } from "../booking-errors";
 
 import type { NormalizedRate, QuoteRequest } from "./types";
 import type { ShipmentBookingResult, ShipmentParty, StoredQuote } from "./shipment-types";
@@ -222,14 +223,14 @@ export async function dispatchWwexShipment(quote: StoredQuote, reconcileOnly = f
   const productTransactionId = String(quote.provider_ref.productTransactionId || "");
   const offerId = String(quote.provider_ref.offerId || "");
   if (!productTransactionId || !offerId) throw new Error("The WWEX quote reference is missing or expired. Request new rates.");
-  const existingDocument = await getWwexBolDocument(productTransactionId);
+  const existingDocument = await beforeShipmentSubmission(() => getWwexBolDocument(productTransactionId), "WWEX lookup failed before order submission.");
   if (existingDocument) {
     const existingPickup = await getWwexPickupIdByBol(existingDocument.bolNumber);
     if (!existingPickup) throw new Error("WWEX BOL exists but pickup is not confirmed. Keep the reservation pending.");
     return { shipmentId: productTransactionId, pickupId: existingPickup, bolNumber: existingDocument.bolNumber, bolUrl: `/api/quotes/${quote.id}/document`, documentRef: productTransactionId };
   }
   if (reconcileOnly) throw new Error("WWEX documents are not ready. Keep the reservation pending for manual reconciliation.");
-  const token = await getToken();
+  const token = await beforeShipmentSubmission(() => getToken(), "WWEX authentication failed before order submission.");
   const address = (party: ShipmentParty, type: "SENDER" | "RECEIVER") => ({ address: { addressLineList: [party.address1, party.address2].filter(Boolean), locality: party.city, region: party.state, postalCode: party.zip, countryCode: "US", companyName: party.company, phone: party.phone, contactList: [contact(party, type)] } });
   const deliveryInstructions = quote.receiver.deliveryStartTime && quote.receiver.deliveryEndTime
     ? `Delivery hours (local time): ${quote.receiver.deliveryStartTime} - ${quote.receiver.deliveryEndTime}` : "";

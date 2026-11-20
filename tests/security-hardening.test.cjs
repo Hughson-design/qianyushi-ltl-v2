@@ -8,6 +8,7 @@ function load(path, names, globals = {}) {
   const source = stripTypeScriptTypes(fs.readFileSync(path, 'utf8').replace(/^import .*;\r?\n/gm, '')).replace(/\bexport /g, '');
   return vm.runInNewContext(source + '\n;({' + names.join(',') + '})', { console, Buffer, Request, Response, URL, URLSearchParams, AbortSignal, Date, process: { env: {} }, ...globals });
 }
+const bookingErrors = load('src/lib/booking-errors.ts', ['NoShipmentSubmissionError','beforeShipmentSubmission','isNoShipmentSubmissionError','isTqlValidationRejection']);
 const safe = load('src/lib/booking-safety.ts', ['bookingParty', 'validateBooking', 'priority1BookingReference'], { formatPhoneNumber: s => s });
 const id = '12345678-1234-1234-1234-123456789abc';
 const party = { company: 'Test', contact: 'Test', country: 'United States', address1: '1 Test St', address2: '', zip: '90670', state: 'CA', city: 'Test', phone: '5572145975', extension: '', email: 'test@example.com' };
@@ -22,7 +23,7 @@ test('Priority1 recovery uses full unique quote ID, never customer PO or a trunc
   for (const matching of [false, true]) {
     const calls = [];
     const carrier = load('src/lib/carriers/priority1.ts', ['dispatchPriority1Shipment'], {
-      priority1BookingReference: safe.priority1BookingReference,
+      priority1BookingReference: safe.priority1BookingReference, ...bookingErrors,
       process: { env: { PRIORITY1_API_BASE: 'https://example.test', PRIORITY1_API_KEY: 'fixture' } },
       fetch: async (url, init) => { calls.push({ url, body: JSON.parse(init.body) }); return Response.json({ shipments: [{ id: 'provider-id', shipmentIdentifiers: [{ type: 'CUSTOMER_REFERENCE', value: matching ? one : 'shared-po' }, { type: 'BILL_OF_LADING', value: 'bol' }, { type: 'PICKUP', value: 'pickup' }] }] }); },
     });
@@ -32,16 +33,16 @@ test('Priority1 recovery uses full unique quote ID, never customer PO or a trunc
     assert.equal(calls[0].url.includes('/dispatch'), false);
   }
 });
-function bolHarness({ role = 'admin', canSelfBook = true, status = 'draft', version = 2, expires = Date.now() + 60000, fail = false, invalid = false, proof = true } = {}) {
+function bolHarness({ role = 'admin', canSelfBook = true, status = 'draft', version = 2, expires = Date.now() + 60000, fail = false, invalid = false, proof = true, noSubmit = false, releaseFails = false } = {}) {
   const calls = [], dispatches = [];
-  const quote = { id, status, provider: 'priority1', provider_ref: { bookingVersion: version, offerExpiresAt: expires, shipmentProof: 'proof' } };
+  const quote = { id, customer_id: "owner-customer", status, provider: 'priority1', provider_ref: { bookingVersion: version, offerExpiresAt: expires, shipmentProof: 'proof' } };
   const route = load('src/app/api/quotes/[id]/bol/route.ts', ['POST'], {
     NextResponse: { json: (body, options) => Response.json(body, options) },
     requireAppSession: async () => ({ session: { customerId: 'customer', userId: 'user', role, canSelfBook } }), customerFilter: () => '&customer_id=eq.customer',
-    verifyShipmentProof: () => proof, validateBooking: () => { if (invalid) throw Error('Invalid contact'); },
+    isNoShipmentSubmissionError: bookingErrors.isNoShipmentSubmissionError, verifyShipmentProof: (_proof, _id, owner) => { assert.equal(owner, 'owner-customer'); return proof; }, validateBooking: () => { if (invalid) throw Error('Invalid contact'); },
     supabaseRequest: async () => Response.json([quote]),
-    supabaseRpc: async (name) => { calls.push(name); return Response.json(true); },
-    dispatchPriority1Shipment: async (value, only) => { dispatches.push(only); if (fail) throw Error('Secret provider data'); return { shipmentId: 'provider', bolNumber: 'bol' }; },
+    supabaseRpc: async (name) => { calls.push(name); if (name === "release_unsubmitted_booking") return Response.json({ released: true }, { status: releaseFails ? 503 : 200 }); return Response.json(true); },
+    dispatchPriority1Shipment: async (value, only) => { dispatches.push(only); if (noSubmit) throw new bookingErrors.NoShipmentSubmissionError('Carrier lookup failed before dispatch'); if (fail) throw Error('Secret provider data'); return { shipmentId: 'provider', bolNumber: 'bol' }; },
   });
   return { calls, dispatches, post: (reconcile = false) => route.POST(new Request('https://test/api/quotes/' + id + '/bol' + (reconcile ? '?reconcile=true' : ''), { method: 'POST' }), { params: Promise.resolve({ id }) }) };
 }
@@ -55,6 +56,16 @@ test('timeouts, malformed responses and missing BOL keep reservation and do not 
   assert.equal(response.status, 409); const data = await response.json();
   assert.equal(data.reconciliationRequired, true); assert.equal(JSON.stringify(data).includes('Secret'), false);
   assert.deepEqual(h.calls, ['reserve_quote_for_bol']);
+});
+test('positive no-submission evidence releases through the audited RPC, but failed release stays pending', async () => {
+  const h = bolHarness({ noSubmit: true });
+  const response = await h.post(); assert.equal(response.status, 422);
+  assert.equal((await response.json()).reservationReleased, true);
+  assert.deepEqual(h.calls, ['reserve_quote_for_bol','release_unsubmitted_booking']);
+  const failed = bolHarness({ noSubmit: true, releaseFails: true });
+  assert.equal((await failed.post()).status, 409);
+  const reconciling = bolHarness({ status: 'booking', noSubmit: true });
+  assert.equal((await reconciling.post(true)).status, 409); assert.deepEqual(reconciling.calls, []);
 });
 test('reconciliation is admin-only, read-only at the carrier, and never reserves twice even after expiry', async () => {
   const h = bolHarness({ status: 'booking', expires: 1 }); assert.equal((await h.post(true)).status, 200);
@@ -134,7 +145,7 @@ test('database errors are redacted except approved business errors', async () =>
 test('TQL lookup failures and read-only reconciliation never call tender', async () => {
   for (const status of [200, 500]) {
     const calls = [];
-    const api = load('src/lib/carriers/tql.ts', ['dispatchTqlShipment'], {
+    const api = load('src/lib/carriers/tql.ts', ['dispatchTqlShipment'], { ...bookingErrors,
       process: { env: { TQL_CLIENT_ID: 'fixture', TQL_SUBSCRIPTION_KEY: 'fixture', TQL_USERNAME: 'fixture', TQL_PASSWORD: 'fixture', TQL_SCOPE: 'fixture' } },
       fetch: async url => { calls.push(url); return url.endsWith('/token') ? Response.json({ access_token: 'fixture' }) : Response.json({ content: {} }, { status }); },
     });
@@ -145,11 +156,62 @@ test('TQL lookup failures and read-only reconciliation never call tender', async
 test('WWEX lookup failure or missing pickup cannot be recovered as a complete shipment', async () => {
   for (const status of [200, 500]) {
     const calls = [];
-    const api = load('src/lib/carriers/wwex.ts', ['dispatchWwexShipment'], {
+    const api = load('src/lib/carriers/wwex.ts', ['dispatchWwexShipment'], { ...bookingErrors,
       process: { env: { WWEX_AUTH_URL: 'https://fixture/token', WWEX_API_BASE: 'https://fixture', WWEX_CLIENT_ID: 'fixture', WWEX_CLIENT_SECRET: 'fixture', WWEX_AUDIENCE: 'fixture' } },
       fetch: async url => { calls.push(url); return url.endsWith('/token') ? Response.json({ access_token: 'fixture' }) : url.endsWith('/documentDownloadFlow') ? Response.json({ response: { securedLinks: ['https://fixture/NUD123.pdf'] } }, { status }) : Response.json({ response: { documentList: [] } }); },
     });
     await assert.rejects(api.dispatchWwexShipment({ id, freight_items: [], provider_ref: { productTransactionId: 'own', offerId: 'own' } }, true));
     assert.equal(calls.some(url => url.endsWith('/quoteOrderFlow')), false);
   }
+});
+
+test('Priority1 preflight failure is releasable, partial matching shipment is not', async () => {
+  for (const partial of [false,true]) {
+    const api=load('src/lib/carriers/priority1.ts',['dispatchPriority1Shipment'],{
+      ...bookingErrors,priority1BookingReference:safe.priority1BookingReference,
+      process:{env:{PRIORITY1_API_BASE:'https://fixture',PRIORITY1_API_KEY:'fixture'}},
+      fetch:async url=>{assert.ok(!url.includes('/dispatch'));return partial?Response.json({shipments:[{id:'existing',shipmentIdentifiers:[{type:'CUSTOMER_REFERENCE',value:safe.priority1BookingReference(id)}]}]}):new Response(null,{status:500});}
+    });
+    await assert.rejects(api.dispatchPriority1Shipment({id,freight_items:[]}),e=>bookingErrors.isNoShipmentSubmissionError(e)===!partial);
+  }
+});
+test('TQL auto-release needs structured rejection and a successful matching no-PO follow-up',async()=>{
+  for(const mode of ['validated','bare400','lookup500','existingPO','wrongQuote','missingPO','tenderedWithoutPO']){
+    let lookups=0,tenders=0;
+    const api=load('src/lib/carriers/tql.ts',['dispatchTqlShipment'],{
+      ...bookingErrors,process:{env:{TQL_CLIENT_ID:'fixture',TQL_SUBSCRIPTION_KEY:'fixture',TQL_USERNAME:'fixture',TQL_PASSWORD:'fixture',TQL_SCOPE:'fixture'}},
+      fetch:async url=>{
+        if(url.endsWith('/token'))return Response.json({access_token:'fixture'});
+        if(url.endsWith('/tender')){tenders++;return Response.json(mode==='bare400'?{}:{statusCode:400,content:{errors:['Invalid address']}},{status:400});}
+        lookups++;
+        if(lookups>1&&mode==='lookup500')return new Response(null,{status:500});
+        return Response.json({content:{quoteId:lookups>1&&mode==='wrongQuote'?999:1,...(lookups>1&&mode==='missingPO'?{}:{poNumber:lookups>1&&mode==='existingPO'?123:null}),tenderedDate:lookups>1&&mode==='tenderedWithoutPO'?'2026-11-20':null}});
+      }
+    });
+    await assert.rejects(api.dispatchTqlShipment({freight_items:[],provider_ref:{quoteId:1,carrierPriceId:2},sender:{...party},receiver:{...party},reference:'fixture',pickup_ready_time:'08:00',pickup_close_time:'17:00'}),e=>bookingErrors.isNoShipmentSubmissionError(e)===(mode==='validated'));
+    assert.equal(tenders,1);assert.equal(lookups,mode==='bare400'?1:2);
+  }
+});
+function releaseHarness({denied=false,quoteOverride={}}={}){
+  const calls=[];
+  const quote={id,customer_id:'actual-owner',quote_number:'TEST',reference:'PO',price:123,status:'booking',updated_at:new Date(Date.now()-600001).toISOString(),...quoteOverride};
+  const api=load('src/app/api/quotes/[id]/release/route.ts',['GET','POST'],{
+    NextResponse:{json:(b,o)=>Response.json(b,o)},
+    requireAdminSession:async()=>denied?{response:Response.json({error:'Denied'},{status:403})}:{session:{userId:'actual-admin',customerId:'different-workspace'}},
+    supabaseRequest:async path=>Response.json(path.startsWith('saved_quotes')?[quote]:path.startsWith('customers')?[{name:'Actual owner'}]:[]),
+    supabaseRpc:async(name,body)=>{calls.push({name,body});return Response.json({released:true,amount:123,status:'draft'});}
+  });
+  return {calls,get:()=>api.GET(new Request('https://fixture/release'),{params:Promise.resolve({id})}),post:(body={reason:'Carrier support confirmed no shipment',confirmedNoShipment:true},origin='https://fixture')=>api.POST(new Request('https://fixture/release',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(body)}),{params:Promise.resolve({id})})};
+}
+test('manual release requires admin, origin, confirmation, reason, cooldown and no shipment identifiers',async()=>{
+  const denied=releaseHarness({denied:true});assert.equal((await denied.get()).status,403);assert.equal((await denied.post()).status,403);
+  const h=releaseHarness();assert.equal((await h.post(undefined,'https://evil.test')).status,403);
+  for(const body of [{reason:'Too short',confirmedNoShipment:true},{reason:'A sufficient audit reason',confirmedNoShipment:false}])assert.equal((await h.post(body)).status,400);
+  for(const quoteOverride of [{status:'booked'},{bol_number:'BOL'},{provider_shipment_id:'existing'},{updated_at:new Date().toISOString()}]){
+    const guarded=releaseHarness({quoteOverride});assert.equal((await guarded.post()).status,409);assert.equal(guarded.calls.length,0);
+  }
+  assert.equal(h.calls.length,0);
+  assert.equal((await h.post({reason:'Confirmed in carrier portal, no shipment exists',confirmedNoShipment:true,p_customer_id:'spoof',amount:99999})).status,200);
+  assert.equal(h.calls[0].body.p_customer_id,'actual-owner');assert.equal(h.calls[0].body.p_actor_user_id,'actual-admin');assert.equal(h.calls[0].body.amount,undefined);
+  assert.equal((await (await h.get()).json()).quote.customerName,'Actual owner');
 });

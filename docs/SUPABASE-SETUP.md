@@ -44,6 +44,7 @@
 18. `outputs/supabase-fix-booking-attempt-ledger.sql`
 19. `outputs/supabase-security-hardening.sql`
 20. `outputs/supabase-enable-ai-budget.sql`
+21. `outputs/supabase-enable-booking-release-audit.sql`
 
 为什么要按顺序：
 

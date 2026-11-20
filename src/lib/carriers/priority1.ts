@@ -1,5 +1,6 @@
 import "server-only";
 import { priority1BookingReference } from "../booking-safety";
+import { beforeShipmentSubmission, NoShipmentSubmissionError } from "../booking-errors";
 
 import type { NormalizedRate, QuoteRequest } from "./types";
 import type { ShipmentBookingResult, StoredQuote } from "./shipment-types";
@@ -132,19 +133,19 @@ export async function dispatchPriority1Shipment(quote: StoredQuote, reconcileOnl
   // Use the full system quote ID, never a customer-supplied PO, for recovery.
   const reference = priority1BookingReference(quote.id);
   if (!reference) throw new Error("A customer reference is required before generating a Priority1 BOL.");
-  const existingResponse = await fetch(`${priority1Base()}/v2/ltl/shipments/status`, {
+  const existingResponse = await beforeShipmentSubmission(() => fetch(`${priority1Base()}/v2/ltl/shipments/status`, {
     method: "POST",
     headers: priority1Headers(),
     body: JSON.stringify({ identifierType: "CUSTOMER_REFERENCE", identifierValue: reference }),
     cache: "no-store",
-  });
+  }), "Priority1 lookup failed before dispatch; no booking request was submitted.");
   if (existingResponse.status !== 404) {
     if (!existingResponse.ok) {
-      throw new Error("Priority1 shipment lookup failed. Booking was not submitted; verify existing shipments before retrying.");
+      throw new NoShipmentSubmissionError("Priority1 lookup failed before dispatch; no booking request was submitted.");
     }
-    const existing = await existingResponse.json();
+    const existing = await beforeShipmentSubmission(() => existingResponse.json(), "Priority1 lookup returned invalid data before dispatch.");
     if (!Array.isArray(existing.shipments)) {
-      throw new Error("Priority1 returned an unexpected shipment lookup response. Booking was not submitted.");
+      throw new NoShipmentSubmissionError("Priority1 lookup returned invalid data before dispatch.");
     }
     if (existing.shipments.length > 0) {
       const shipment = existing.shipments.length === 1 ? existing.shipments[0] as { id?: string | number; shipmentIdentifiers?: { type: string; value: string }[] } : null;

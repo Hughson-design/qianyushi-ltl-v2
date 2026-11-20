@@ -1,0 +1,19 @@
+.booking-release-dialog { width: min(620px, calc(100vw - 32px)); max-height: 90vh; overflow-y: auto; background: white; padding: 24px; border-radius: 16px; color: #18382b; }
+.booking-release-dialog header, .booking-release-dialog footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.booking-release-dialog h2 { margin: 4px 0 12px; font-size: 23px; }
+.booking-release-dialog button { cursor: pointer; padding: 9px 14px; border: 1px solid #c6d8ce; border-radius: 8px; background: #f5f9f6; color: #176b4a; font-weight: 700; }
+.booking-release-dialog button:disabled { opacity: .45; cursor: not-allowed; }
+.booking-release-dialog dl { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px; background: #f2f7f4; border-radius: 8px; }
+.booking-release-dialog dt, .release-audit small { display: block; font-size: 12px; color: #5a7165; }
+.booking-release-dialog dd { margin: 5px 0 0; overflow-wrap: anywhere; font-weight: 700; }
+.booking-release-dialog .release-warning { padding: 12px; background: #fff2de; border-left: 4px solid #bc7518; color: #765019; line-height: 1.6; }
+.booking-release-dialog form label { display: block; margin: 12px 0; font-size: 13px; line-height: 1.6; }
+.booking-release-dialog textarea { display: block; width: 100%; min-height: 95px; margin-top: 7px; padding: 10px; border: 1px solid #bfd0c5; border-radius: 7px; font: inherit; }
+.booking-release-dialog .release-confirm { display: flex; align-items: flex-start; gap: 8px; }
+.release-confirm input { margin-top: 4px; flex-shrink: 0; }
+.booking-release-dialog .release-submit { color: white; background: #176b4a; }
+.booking-release-dialog footer { margin-top: 20px; padding-top: 14px; border-top: 1px solid #dce6df; }
+.release-audit { padding-left: 20px; font-size: 13px; }
+.release-audit li { padding: 10px 0; border-bottom: 1px solid #e0e9e3; }
+.release-audit p { margin: 5px 0; overflow-wrap: anywhere; }
+@media(max-width:600px) { .booking-release-dialog { padding: 18px; } .booking-release-dialog textarea { font-size: 16px; } }

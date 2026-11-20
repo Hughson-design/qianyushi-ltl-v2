@@ -12,9 +12,9 @@
 
 - 新草稿标记 bookingVersion=2，报价到期时间参与签名，过期先重新报价。
 - Priority1 的恢复标识为 `QY-` 加完整 Quote UUID（去连字符），共 35 字符。用户 PO 仍在网站保留，不能用于承运商恢复匹配。
-- 已知联系人、货物、邮件等缺失在资金预留前拒绝。开始出单后的任何异常保留 booking 和押金预留，禁止再次创建。
-- 总管理员在 Quotes 点“核对已有运单”：仅查询已有运单/文件，不调用 dispatch/tender，不再次扣款。找不到、多个匹配、Reference 不匹配或 BOL 不齐全则继续保留待核对。
-- 核对不是自动退款按钮。只有运营人员向承运商确认未创建或完成取消后，才能人工按客户、Quote 和流水核实释放资金；不得仅凭 HTTP 错误或超时释放。
+- 已知联系人、货物、邮件等缺失在资金预留前拒绝。仅在确认没有提交创建请求，或 TQL 返回明确校验拒绝且再次查询同一 Quote 无 PO 时自动释放。超时、格式错误、已有部分运单或结果不明仍保留 booking 和押金预留，禁止再次创建。
+- 总管理员在 Quotes 点“核对已有运单”：按 Quote 的实际所属客户校验签名，无需先切换客户；仅查询已有运单/文件，不调用 dispatch/tender，不再次扣款。找不到、多个匹配、Reference 不匹配或 BOL 不齐全则继续保留待核对。
+- 核对不是退款按钮。总管理员在 Quotes 点击“释放预留 / 审计”，至少等待下单开始五分钟，先向承运商确认没有有效运单及提货安排，再填写 10—1000 字的核对依据并勾选确认。操作仅释放本站押金，不取消承运商订单；已有运单标识不能用此入口。释放与流水、操作人、原因审计在同一事务内写入，重复点击不重复退款。无需手工改 SQL。
 - 旧草稿、旧待核对记录不具备新安全标识，禁止自动恢复/出单；旧 Priority1 运单也禁止网站直接取消。先人工核查承运商，不能直接复制后重下。
 - 客户没有自行出单权限时，也禁止其自行取消。独立取消权限可作为后续业务扩展。
 
@@ -29,8 +29,16 @@
 
 ## 尚需外部配置核对
 
-1. Vercel 设置独立 `QUOTE_SIGNING_KEY`，使用至少 32 字节随机值，Secret、Production；保存后重新部署。首次设置兼容现有 Supabase 签名，后续轮换用 QUOTE_PREVIOUS_SIGNING_KEY 临时保留上一签名密钥。清空所有使用旧密钥的 booking 前不能移除其验证密钥。未配置独立密钥时仍暂时兼容 Supabase Secret，不能因此宣称密钥已解耦。
+1. 已于 2026-11-20 在 Vercel 只读确认独立 QUOTE_SIGNING_KEY 为 Secret、Production，并已重新部署。新部署仍应设置独立 `QUOTE_SIGNING_KEY`，使用至少 32 字节随机值，Secret、Production；保存后重新部署。首次设置兼容现有 Supabase 签名，后续轮换用 QUOTE_PREVIOUS_SIGNING_KEY 临时保留上一签名密钥。清空所有使用旧密钥的 booking 前不能移除其验证密钥。未配置独立密钥时仍暂时兼容 Supabase Secret，不能因此宣称密钥已解耦。
 2. Supabase Authentication 启用修改密码时要求当前密码。网站已传递 current_password，2026-11-20 已在生产后台启用并确认保存成功。官方说明：https://supabase.com/docs/guides/auth/password-security
 3. 本次测试不创建或取消真实运单。异常后的最终承运商状态和人工释放资金流程仍须按真实记录核对。
 
 验证：`node --test tests/*.test.cjs`、`pnpm build`；测试使用模拟承运商，数据库测试采用临时表和回滚。
+
+## 审计释放与后台复核（2026-11-20）
+
+生产库已执行 `outputs/supabase-enable-booking-release-audit.sql`；`outputs/verify-booking-release-audit.sql` 使用临时表验证自动/人工释放、重复请求、权限、等待期、运单标识和审计流水一致性，全部回滚。该迁移不释放任何真实预留，也不修改现有余额。
+
+新服务端函数 `release_unsubmitted_booking` 将释放、流水、审计合并为一个事务；普通客户端无调用权限，服务端检查当前用户和真实 Quote 所属客户。自动释放仅初次出单阶段使用，管理员只读核对不会自动退款。TQL 不能只凭 HTTP 400 释放：需结构化校验错误及成功的同一 Quote 无 PO 复查。
+
+AI 预算 SQL 已在生产安装；三个配额函数均已复核，已记录真实识别用量，不是仅有文档。共享每日 200,000 token；按用户每日额度尚未增加。登录账户限流可能被恶意触发、CSP unsafe-inline 仍是后续优化项。

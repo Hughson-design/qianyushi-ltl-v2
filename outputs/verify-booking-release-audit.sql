@@ -1,0 +1,44 @@
+-- Temporary fixtures only. No production balances or quotes are updated.
+begin;
+create temp table saved_quotes(id uuid,customer_id uuid,quote_number text,status text,price numeric,updated_at timestamptz,bol_number text,provider_shipment_id text) on commit drop;
+create temp table app_users(user_id uuid,customer_id uuid,active boolean,role text,email text,full_name text) on commit drop;
+create temp table deposit_accounts(customer_id uuid,available_balance numeric,updated_at timestamptz) on commit drop;
+create temp table deposit_transactions(id uuid,quote_id uuid,customer_id uuid,actor_user_id uuid,transaction_type text,amount numeric,balance_after numeric,reason text,idempotency_key text unique) on commit drop;
+create temp table booking_release_audit(like public.booking_release_audit including all) on commit drop;
+do $$
+declare definition text; q uuid:=gen_random_uuid(); c uuid:=gen_random_uuid(); a uuid:=gen_random_uuid(); u uuid:=gen_random_uuid(); r jsonb; rejected boolean;
+begin
+  definition:=pg_get_functiondef('public.release_unsubmitted_booking(uuid,uuid,uuid,text,text)'::regprocedure);
+  execute replace(definition,'public.','pg_temp.');
+  insert into pg_temp.app_users values(a,null,true,'admin','admin@example.test','Test admin'),(u,c,true,'customer','user@example.test','Test user');
+  insert into pg_temp.saved_quotes values(q,c,'TEMP-ONLY','booking',125.50,now(),null,null);
+  insert into pg_temp.deposit_accounts values(c,874.50,now());
+  r:=pg_temp.release_unsubmitted_booking(q,c,u,'Lookup failed before dispatch; no submission','automatic');
+  if not (r->>'released')::boolean or (r->>'balance')::numeric<>1000 then raise exception 'Automatic release failed'; end if;
+  r:=pg_temp.release_unsubmitted_booking(q,c,u,'Duplicate release must not refund twice','automatic');
+  if (r->>'released')::boolean or (select count(*) from pg_temp.deposit_transactions)<>1 then raise exception 'Duplicate release changed ledger'; end if;
+  update pg_temp.saved_quotes set status='booking',updated_at=now()-interval '10 minutes';
+  update pg_temp.deposit_accounts set available_balance=874.50;
+  r:=pg_temp.release_unsubmitted_booking(q,c,a,'Carrier portal checked; no shipment or pickup exists','administrator');
+  if (r->>'balance')::numeric<>1000 or (select count(*) from pg_temp.booking_release_audit)<>2 then raise exception 'Manual release or audit failed'; end if;
+  update pg_temp.saved_quotes set status='booking',updated_at=now();
+  rejected:=false; begin perform pg_temp.release_unsubmitted_booking(q,c,a,'Still processing, must be rejected','administrator'); exception when others then rejected:=true; end;
+  if not rejected then raise exception 'Cooldown bypassed'; end if;
+  update pg_temp.saved_quotes set updated_at=now()-interval '10 minutes';
+  rejected:=false; begin perform pg_temp.release_unsubmitted_booking(q,c,u,'Customer may not manually release funds','administrator'); exception when others then rejected:=true; end;
+  if not rejected then raise exception 'Admin permission bypassed'; end if;
+  rejected:=false; begin perform pg_temp.release_unsubmitted_booking(q,c,a,'short','administrator'); exception when others then rejected:=true; end;
+  if not rejected then raise exception 'Reason requirement bypassed'; end if;
+  update pg_temp.saved_quotes set bol_number='EXISTING-BOL';
+  rejected:=false; begin perform pg_temp.release_unsubmitted_booking(q,c,a,'Existing shipment must not be refunded','administrator'); exception when others then rejected:=true; end;
+  if not rejected then raise exception 'Shipment identifier guard bypassed'; end if;
+  update pg_temp.saved_quotes set bol_number=null,status='booked';
+  rejected:=false; begin perform pg_temp.release_unsubmitted_booking(q,c,a,'Booked shipment must not be refunded','administrator'); exception when others then rejected:=true; end;
+  if not rejected then raise exception 'Booked status guard bypassed'; end if;
+  if (select available_balance from pg_temp.deposit_accounts)<>1000 or (select count(*) from pg_temp.deposit_transactions)<>2 or (select count(*) from pg_temp.booking_release_audit)<>2 then raise exception 'Rejected releases changed balance or audit'; end if;
+  if exists(select 1 from pg_temp.booking_release_audit x left join pg_temp.deposit_transactions t on t.id=x.ledger_transaction_id where t.id is null or t.amount<>x.amount) then raise exception 'Audit and ledger differ'; end if;
+  if has_function_privilege('anon','public.release_unsubmitted_booking(uuid,uuid,uuid,text,text)','EXECUTE') or has_function_privilege('authenticated','public.release_unsubmitted_booking(uuid,uuid,uuid,text,text)','EXECUTE') or not has_function_privilege('service_role','public.release_unsubmitted_booking(uuid,uuid,uuid,text,text)','EXECUTE') then raise exception 'Release function permissions incorrect'; end if;
+end;
+$$;
+select 'Booking release verification passed; duplicate, permissions, cooldown, ledger and audit checked; all changes rolled back' as result;
+rollback;

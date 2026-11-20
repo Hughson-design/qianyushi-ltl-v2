@@ -1,4 +1,5 @@
 "use client";
+import { BookingReleaseDialog } from "./booking-release-dialog";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
@@ -297,6 +298,7 @@ export default function Home() {
   const [customersLoading, setCustomersLoading] = useState(false);
   const [customersError, setCustomersError] = useState("");
   const [customersNotice, setCustomersNotice] = useState("");
+  const [releaseQuoteId, setReleaseQuoteId] = useState<string | null>(null);
   const [pendingBolQuote, setPendingBolQuote] = useState<SavedQuote | null>(null);
   const [customerForm, setCustomerForm] = useState({ name: "", code: "", markupPercent: "0", minimumMarkup: "0", canSelfBook: true, userName: "", email: "", password: "" });
   const [userForm, setUserForm] = useState({ customerId: "", fullName: "", email: "", password: "", role: "customer" });
@@ -1577,7 +1579,7 @@ export default function Home() {
                       <td>{quote.ready_date || "—"}</td>
                       <td><span className={`quote-status ${quote.status}`}>{statusLabel(quote.status)}</span></td>
                       <td className="quote-price">${Number(quote.price).toFixed(2)}</td>
-                      <td><div className="quote-actions">{quote.status === "booking" && (authUser?.role === "admin" ? <button type="button" disabled={quoteActionId === quote.id} onClick={() => void generateBol(quote.id, true)}>{language === "zh" ? "核对已有运单" : "Reconcile existing shipment"}</button> : <span>{language === "zh" ? "请联系管理员核对；勿重复下单" : "Contact an administrator; do not rebook"}</span>)}{quote.status === "draft" && (authUser?.canSelfBook ? <button type="button" onClick={() => confirmAndGenerateBol(quote)} disabled={quoteActionId === quote.id}>{quoteActionId === quote.id ? (language === "zh" ? "生成中…" : "Generating…") : tx("Generate BOL")}</button> : <span>{tx("BOL approval required")}</span>)}{quote.status === "booked" && <>{quote.bol_url ? <a href={quote.bol_url} target="_blank" rel="noreferrer">{tx("Download BOL")}</a> : <span className="bol-number">BOL {quote.bol_number}</span>}<button type="button" className="void-button" onClick={() => void voidShipment(quote)} disabled={!authUser?.canSelfBook || quoteActionId === quote.id}>{quoteActionId === quote.id ? (language === "zh" ? "取消中…" : "Cancelling…") : tx("Void shipment")}</button></>}{quote.status === "booking" && <span>{language === "zh" ? "下单中…" : "Booking…"}</span>}{quote.status === "void" && <span>{tx("Pickup cancelled")}</span>}<button type="button" className="secondary-action" disabled={quote.status === "booking"} onClick={() => copyQuoteForRequote(quote)}>{tx("Copy & requote")}</button></div></td>
+                      <td><div className="quote-actions">{authUser?.role === "admin" && <button type="button" className="secondary-action" onClick={() => setReleaseQuoteId(quote.id)}>{language === "zh" ? (quote.status === "booking" ? "释放预留 / 审计" : "释放记录") : (quote.status === "booking" ? "Release / audit" : "Release audit")}</button>}{quote.status === "booking" && (authUser?.role === "admin" ? <button type="button" disabled={quoteActionId === quote.id} onClick={() => void generateBol(quote.id, true)}>{language === "zh" ? "核对已有运单" : "Reconcile existing shipment"}</button> : <span>{language === "zh" ? "请联系管理员核对；勿重复下单" : "Contact an administrator; do not rebook"}</span>)}{quote.status === "draft" && (authUser?.canSelfBook ? <button type="button" onClick={() => confirmAndGenerateBol(quote)} disabled={quoteActionId === quote.id}>{quoteActionId === quote.id ? (language === "zh" ? "生成中…" : "Generating…") : tx("Generate BOL")}</button> : <span>{tx("BOL approval required")}</span>)}{quote.status === "booked" && <>{quote.bol_url ? <a href={quote.bol_url} target="_blank" rel="noreferrer">{tx("Download BOL")}</a> : <span className="bol-number">BOL {quote.bol_number}</span>}<button type="button" className="void-button" onClick={() => void voidShipment(quote)} disabled={!authUser?.canSelfBook || quoteActionId === quote.id}>{quoteActionId === quote.id ? (language === "zh" ? "取消中…" : "Cancelling…") : tx("Void shipment")}</button></>}{quote.status === "booking" && <span>{language === "zh" ? "下单中…" : "Booking…"}</span>}{quote.status === "void" && <span>{tx("Pickup cancelled")}</span>}<button type="button" className="secondary-action" disabled={quote.status === "booking"} onClick={() => copyQuoteForRequote(quote)}>{tx("Copy & requote")}</button></div></td>
                     </tr>
                   ))}</tbody>
                 </table>
@@ -1706,6 +1708,7 @@ export default function Home() {
           </section>
         </div>
       )}
+      {releaseQuoteId && <BookingReleaseDialog quoteId={releaseQuoteId} language={language} onClose={() => setReleaseQuoteId(null)} onReleased={(released) => { setReleaseQuoteId(null); void showSavedQuotes(); setSavedQuotesNotice(released ? (language === "zh" ? "押金预留已释放，原因和操作人已记录。" : "Deposit reservation released; evidence and actor audited.") : (language === "zh" ? "该预留状态已改变，请查看最新记录。" : "Reservation state already changed; check the latest record.")); }} />}
       {pendingBolQuote && (
         <div className="address-book-backdrop" role="presentation" onMouseDown={() => setPendingBolQuote(null)}>
           <section className="help-dialog" role="dialog" aria-modal="true" aria-labelledby="bol-confirm-title" onMouseDown={(event) => event.stopPropagation()}>

@@ -121,6 +121,7 @@ pnpm start
 18. `outputs/supabase-fix-booking-attempt-ledger.sql`
 19. `outputs/supabase-security-hardening.sql`
 20. `outputs/supabase-enable-ai-budget.sql`
+21. `outputs/supabase-enable-booking-release-audit.sql`
 
 这些脚本使用 `IF NOT EXISTS` 或兼容性修改为主，但生产环境执行前仍应备份数据库。完整说明见 [Supabase 部署说明](docs/SUPABASE-SETUP.md)。
 
