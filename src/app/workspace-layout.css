@@ -1,0 +1,194 @@
+/* Compact workspace: keep controls readable while reducing page height. */
+@media (min-width: 1001px) {
+  .app-shell { grid-template-columns: 224px minmax(0, 1fr); }
+  .app-shell .sidebar { padding: 22px 12px 16px; }
+  .app-shell .brand { gap: 9px; padding: 0 6px 23px; }
+  .app-shell .brand strong { font-size: 10px; }
+  .app-shell .brand-logo { width: 36px; height: 36px; }
+}
+.app-shell .topbar { height: 52px; padding-inline: 24px; }
+.app-shell .content { width: min(1440px, calc(100% - 40px)); padding-top: 24px; }
+.app-shell .page-heading { margin-bottom: 18px; gap: 16px; align-items: center; }
+.app-shell .page-heading h1 { font: 750 27px/1.2 Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: -.035em; }
+.app-shell .page-heading > div > p:last-child:not(.eyebrow) { font-size: 12px; line-height: 1.5; margin-top: 6px; }
+.app-shell .eyebrow { font-size: 9px; letter-spacing: .12em; margin-bottom: 5px; }
+.app-shell .panel { border-radius: 10px; box-shadow: none; }
+
+/* Quote entry and results */
+#quote .deposit-card { min-width: 245px; padding: 9px 12px; gap: 9px; box-shadow: none; grid-template-columns: 30px 1fr auto; border-radius: 9px; }
+#quote .deposit-icon { width: 30px; height: 30px; }
+#quote .deposit-card strong { font-size: 15px; }
+#quote .smart-quote-panel { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 10px 18px; padding: 14px 16px; background: #f1f7f3; border-color: #cfdfd5; border-radius: 10px; box-shadow: none; }
+#quote .smart-quote-copy { gap: 9px; align-self: center; }
+#quote .sparkle { width: 27px; height: 27px; border-radius: 7px; box-shadow: none; }
+#quote .smart-quote-copy h2 { font: 700 16px/1.35 Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: -.02em; }
+#quote .smart-input-row { margin: 0; gap: 8px; }
+#quote .smart-input-row textarea { min-width: 0; min-height: 95px; font-size: 12px; line-height: 1.55; border-radius: 7px; background: #fff; }
+#quote .smart-input-row button { min-width: 86px; padding-inline: 10px; border-radius: 7px; font-size: 12px; }
+.smart-format-help { margin-top: 6px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.smart-format-help summary { cursor: pointer; width: fit-content; color: var(--green); }
+#quote .smart-quote-copy .smart-format-help p { font-size: 11px; }
+#quote .smart-result, #quote .delivery-check-notice { grid-column: 1 / -1; margin-top: 0; }
+#quote form > .panel { margin-top: 10px; padding: 13px 16px; }
+#quote .section-title { margin-bottom: 10px; gap: 9px; }
+#quote .section-title > span { width: 23px; height: 23px; font-size: 10px; color: var(--green); background: #e6f1eb; border-radius: 7px; }
+#quote .section-title h2 { font: 700 16px/1.35 Inter, ui-sans-serif, system-ui, sans-serif; }
+#quote .section-title p { font-size: 10px; }
+#quote .panel:has(.route-grid) .section-title p { display: none; }
+#quote .route-grid-single-row { grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr) 154px; overflow: visible; }
+#quote .route-grid-single-row .ready-field { min-width: 0; }
+#quote .route-grid-single-row .location-field, #quote .route-grid-single-row .ready-date-input { min-height: 38px; height: 38px; border-radius: 7px; }
+#quote .route-grid-single-row .route-line { height: 38px; }
+#quote .route-grid-single-row .location-field { gap: 6px; }
+#quote .freight-item { padding: 9px; border-radius: 7px; background: #f8faf9; }
+#quote .freight-item + .freight-item { margin-top: 8px; }
+#quote .input-group input, #quote .input-group select { height: 36px; padding-inline: 7px; }
+#quote .input-group label { margin-bottom: 5px; font-size: 9px; letter-spacing: .025em; }
+#quote .field-with-unit input { padding-right: 23px; }
+#quote .field-with-unit span { top: 11px; right: 6px; font-size: 9px; }
+#quote .line-index { min-height: 0; }
+#quote .line-index > div { height: 36px; }
+#quote .add-item { margin-top: 6px; padding-block: 5px; }
+#quote .class-note { margin-top: 6px; }
+#quote .services-panel { flex-wrap: wrap; gap: 10px 18px; }
+#quote .services-title { margin: 0; }
+#quote .service-grid { flex: 1; flex-wrap: wrap; }
+#quote .form-footer { margin-top: 12px; }
+#quote .rates-section { margin-top: 24px; }
+#quote .rates-heading { margin-bottom: 10px; }
+#quote .rates-heading h2 { font: 750 21px/1.3 Inter, ui-sans-serif, system-ui, sans-serif; }
+#quote .rate-list { gap: 0; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+#quote .rate-card { min-height: 52px; padding: 7px 12px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; gap: 10px; }
+#quote .rate-card:last-child { border-bottom: 0; }
+#quote .rate-card:nth-child(even) { background: #f1f6f3; }
+#quote .rate-card:hover, #quote .rate-card.selected { transform: none; box-shadow: inset 3px 0 var(--green); background: #e8f3ed; }
+#quote .price strong { font: 750 20px/1.2 Inter, ui-sans-serif, system-ui, sans-serif; }
+.app-shell .quotes-table td { padding-block: 10px; }
+.app-shell .quotes-table tbody tr:nth-child(even) { background: #f7faf8; }
+
+/* Company accounts */
+.company-admin-page .page-heading, .company-account .page-heading { align-items: center; }
+.app-shell .company-account-nav { gap: 3px; padding: 4px; border: 1px solid #dce6df; border-radius: 9px; background: #edf3ef; }
+.app-shell .company-account-nav button, .app-shell .company-account-nav span { padding: 7px 11px; font-size: 12px; border: 0; border-radius: 6px; white-space: nowrap; }
+.app-shell .company-account-nav button:hover { background: #fff; }
+.app-shell .company-account-nav span { color: var(--green); background: white; box-shadow: 0 1px 4px #173c2412; }
+.company-admin-page .customers-page-grid { gap: 12px; }
+.company-admin-page .customer-create-panel { padding: 11px 15px; background: #fff; }
+.company-admin-page .customer-create-panel > summary { font-size: 12px; }
+.company-admin-page .workspace-directory, .company-admin-page .users-directory { padding: 16px; }
+.workspace-directory-title { display: flex; align-items: center; gap: 9px; }
+.workspace-directory-heading h2, .app-shell .directory-heading h2 { font: 750 17px/1.4 Inter, ui-sans-serif, system-ui, sans-serif; }
+.directory-count { padding: 3px 7px; border-radius: 5px; background: #e8f2ec; color: var(--green); font-size: 11px; font-weight: 750; }
+.workspace-directory-heading input { height: 33px; width: min(220px, 100%); font-size: 12px; }
+.workspace-card-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 9px; margin-top: 12px; }
+.workspace-summary { padding: 11px 12px; border-radius: 8px; }
+.workspace-summary.selected { border-color: #5a9877; background: #f1f8f3; box-shadow: inset 3px 0 #438363; }
+.workspace-summary header { gap: 8px; }
+.workspace-summary h3 { font-size: 12px; line-height: 1.45; }
+.workspace-summary header p { margin-top: 3px; font-size: 10px; }
+.workspace-summary .company-user-status { font-size: 10px; gap: 4px; }
+.workspace-summary dl { gap: 8px; padding: 8px 0; margin: 9px 0; }
+.workspace-summary dt { font-size: 10px; }
+.workspace-summary dd { margin-top: 2px; font-size: 13px; }
+.workspace-summary footer { font-size: 10px; gap: 5px; }
+.workspace-card-actions { gap: 6px; }
+.workspace-card-actions > button { padding: 5px 7px; font-size: 11px; }
+.workspace-current { font-size: 10px; }
+.app-shell .directory-heading { margin-bottom: 12px; }
+.app-shell .company-users-list { box-shadow: none; }
+.app-shell .company-users-list th { background: #f0f5f2; font-size: 10px; }
+.app-shell .company-users-list td { font-size: 12px; }
+.app-shell .company-users-list th, .app-shell .company-users-list td { padding: 10px; }
+.app-shell .company-users-list tbody tr:nth-child(even) { background: #f8faf9; }
+.app-shell .company-user-toolbar { margin-bottom: 14px; padding: 12px; border: 1px solid var(--line); background: white; border-radius: 9px; }
+.app-shell .company-user-toolbar input, .app-shell .company-user-toolbar select { min-height: 34px; }
+.app-shell .company-user-toolbar .company-add-user { min-height: 34px; background: var(--green); color: white; }
+.app-shell .company-user-toolbar .company-add-user:hover { background: var(--green-dark); }
+
+/* Document import and review */
+.reader-page .reader-layout { gap: 16px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); }
+.reader-page .reader-layout .panel { padding: 18px; border-radius: 10px; }
+.reader-page .reader-section-heading { gap: 9px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid #e4ebe6; }
+.reader-page .reader-section-heading h2 { font-size: 16px; margin-bottom: 3px; }
+.reader-page .reader-section-heading p { font-size: 11px; }
+.reader-page .reader-step { height: 27px; flex-basis: 27px; border-radius: 7px; font-size: 12px; color: var(--green); background: #e7f2eb; }
+.reader-page textarea { min-height: 145px; padding: 10px; font-size: 12px; line-height: 1.6; border-radius: 7px; }
+.reader-page .reader-dropzone { position: relative; gap: 5px; margin-top: 10px; padding: 12px; border-radius: 7px; background: #f8fbf9; }
+.reader-page .reader-upload-symbol { display: none; }
+.reader-page .reader-dropzone strong { font-size: 12px; }
+.reader-page .reader-upload-actions { margin: 3px 0; }
+.reader-page .reader-secondary { padding: 7px 12px; border-radius: 6px; }
+.reader-page .reader-ai-choice { margin: 10px 0; padding: 10px; border: 1px solid #e1e9e4; background: #f8faf9; }
+.reader-page .reader-ai-choice label small { display: block; margin-top: 3px; }
+.reader-page .reader-budget { padding: 9px 10px; margin-top: 9px; font-size: 12px; }
+.reader-page .reader-budget p { line-height: 1.6; margin: 5px 0; color: #52695d; }
+.reader-budget-details { margin-top: 6px; border-top: 1px solid #e3eae5; padding-top: 6px; }
+.reader-budget-meter { display: block; width: 100%; height: 5px; margin: 8px 0; accent-color: var(--green); }
+.reader-budget-details summary { cursor: pointer; color: var(--green); font-size: 11px; }
+.reader-page .reader-budget.reader-budget-blocked { border-color: #c74435; background: #fff0ed; }
+.reader-page .reader-budget-blocked p { color: #8e241b; }
+.reader-page .reader-form-actions { margin-top: 12px; gap: 8px; }
+.reader-page .reader-primary, .reader-page .reader-use { padding: 10px 16px; border-radius: 7px; }
+.reader-page .reader-empty { min-height: 250px; padding: 24px 15px; border: 1px dashed #d7e4dc; border-radius: 8px; background: #fafcfb; }
+.reader-page .reader-empty > span { height: 48px; width: 48px; margin-bottom: 14px; border-radius: 12px; font-size: 26px; }
+.reader-page .reader-empty h3 { font-size: 14px; }
+.reader-page .reader-heading h1 { font-size: 27px; }
+.reader-page .reader-freight-editor { padding: 10px; margin-block: 12px; }
+.reader-page .reader-route { margin-block: 12px; gap: 8px; }
+.reader-page .reader-table th, .reader-page .reader-table td { padding: 8px 6px; }
+.reader-page .reader-output { min-width: 0; }
+
+@media (max-width: 1500px) {
+  #quote .freight-line-scroll { overflow: visible; padding-bottom: 0; }
+  #quote .freight-grid-v3 { min-width: 0; grid-template-columns: 34px repeat(7, minmax(0, 1fr)); gap: 9px 8px; }
+  #quote .line-index { grid-row: span 2; align-self: stretch; justify-content: center; }
+  #quote .freight-grid-v3 .input-group { min-width: 0; }
+}
+@media (max-width: 1100px) {
+  .app-shell .page-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+  #quote .page-heading { flex-direction: row; align-items: center; }
+  #quote .smart-quote-panel { grid-template-columns: 170px minmax(0, 1fr); gap: 12px; }
+  .reader-page .reader-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+@media (max-width: 800px) {
+  .reader-page .reader-layout { grid-template-columns: minmax(0, 1fr); }
+  .reader-page .reader-empty { min-height: 170px; }
+  #quote .smart-quote-panel { grid-template-columns: minmax(0, 1fr); }
+  #quote .smart-quote-copy { align-items: center; }
+  #quote .route-grid-single-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  #quote .route-grid-single-row .route-line { display: none; }
+  #quote .ready-field { grid-column: 1 / -1; }
+}
+@media (max-width: 660px) {
+  .app-shell .content { width: calc(100% - 24px); padding-top: 18px; padding-bottom: 45px; }
+  .app-shell .topbar { height: 46px; padding-inline: 12px; }
+  .app-shell .page-heading h1 { font-size: 23px; }
+  #quote .page-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
+  #quote .deposit-card { width: 100%; padding-block: 7px; }
+  #quote .smart-quote-panel, #quote form > .panel { padding: 12px; }
+  #quote .smart-input-row { grid-template-columns: minmax(0, 1fr); }
+  #quote .smart-input-row textarea, .reader-page textarea { font-size: 16px; }
+  #quote .smart-input-row button { min-height: 40px; }
+  #quote .route-grid-single-row { grid-template-columns: minmax(0, 1fr); }
+  #quote .freight-grid-v3 { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 8px; }
+  #quote .line-index { grid-row: auto; grid-column: 1 / -1; flex-direction: row; justify-content: space-between; align-items: center; }
+  #quote .line-index > div { height: 20px; }
+  #quote .line-remove-placeholder { display: none; }
+  #quote .input-group input, #quote .input-group select { height: 40px; font-size: 16px; }
+  #quote .input-group label { font-size: 10px; }
+  #quote .freight-grid-v3 .input-group:nth-last-child(2) { grid-column: span 2; }
+  #quote .freight-grid-v3 .input-group:last-child { grid-column: 1 / -1; }
+  #quote .form-footer .quote-rate-actions { width: 100%; }
+  #quote .rate-card { gap: 7px; grid-template-columns: 22px 16px minmax(0, 1fr) 48px auto; padding-inline: 8px; }
+  #quote .carrier strong { font-size: 12px; overflow-wrap: anywhere; }
+  #quote .price strong { font-size: 17px; }
+  .workspace-card-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 205px), 1fr)); }
+  .app-shell .company-account-nav { gap: 2px; width: 100%; }
+  .app-shell .company-account-nav button, .app-shell .company-account-nav span { padding: 7px 8px; font-size: 11px; }
+  .app-shell .company-users-list tr td { padding: 2px 0; }
+  .company-admin-page .workspace-directory, .company-admin-page .users-directory { padding: 12px; }
+  .reader-page .reader-layout .panel { padding: 14px; }
+  .reader-page .reader-draft-pill { padding: 5px 9px; }
+  .app-shell .company-user-toolbar { gap: 10px; }
+  .app-shell .company-user-toolbar label { flex-wrap: wrap; min-width: 0; }
+}

@@ -182,9 +182,12 @@ export function ShipmentReaderPanel({ language, onUse }: Props) {
             <strong>{quotaBlocked ? copy("AI 已暂停：额度不足或用量保护暂不可用", "AI paused: allowance unavailable or insufficient") : "GPT-6 Luna"}</strong>
             {quotaBlocked && <small>{copy("恢复后请刷新页面再试。可取消勾选 AI，继续普通文字解析。", "Refresh after service or allowance is restored. Basic text parsing remains available with AI unchecked.")}</small>}
             {quota && <p>{copy("本站今日保护额度：", "Site daily allowance: ")}{quota.limit.toLocaleString()} tokens · {copy("已计入", "Recorded")} {quota.used.toLocaleString()} · {copy("预留", "Reserved")} {quota.reserved.toLocaleString()} · {copy("剩余", "Remaining")} {quota.remaining.toLocaleString()}</p>}
+            {quota && <progress className="reader-budget-meter" max={quota.limit} value={Math.min(quota.limit, quota.used + quota.reserved)} aria-label={copy("今日 AI 保护额度已用及预留", "Daily AI allowance used and reserved")} />}
+            <details className="reader-budget-details"><summary>{copy("额度与数据说明", "Allowance and data details")}</summary>
             <small>{copy("识别前核算并预留用量，余量不足不发送、不自动转付费。每日 UTC 00:00 重置。保护额度为20万 tokens，低于25万免费额度以保留安全余量。", "Usage is counted and reserved before extraction. Insufficient allowance stops the request without paid fallback. Resets at 00:00 UTC. The 200,000-token site cap leaves headroom below the 250,000-token free allowance.")}</small>
             <small>{copy("这是本站用量，不是 OpenAI 全组织余额；其他应用使用同一免费额度组也会消耗额度。免费资格及数据共享设置须保持有效。", "This tracks this site, not organization-wide usage. Other applications share the OpenAI pool. Eligibility and data-sharing settings must remain active.")}</small>
             <small>{copy("超时或用量未确认时按本次预留上限保守计入，避免低估；这里的计数不等于账单金额。", "Unconfirmed requests conservatively count their full reservation. These protection counters are not billing totals.")}</small>
+            </details>
           </div>}
           {aiAvailable === false && <p>{copy("AI 尚未启用：请管理员配置 OPENAI_API_KEY。普通文字解析可先使用。", "AI is not enabled. Ask the administrator to configure OPENAI_API_KEY. Basic text parsing is available.")}</p>}
           {hasBinary && !useAi && <p>{copy("图片、扫描 PDF、Word 和 Excel 需要启用 AI 识别。", "Images, PDFs, Word, and Excel require AI extraction.")}</p>}

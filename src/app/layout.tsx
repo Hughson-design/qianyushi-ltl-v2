@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./shipment-reader.css";
+import "./workspace-layout.css";
 
 export const metadata: Metadata = {
   title: "Qianyushi LTL",

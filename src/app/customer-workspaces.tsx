@@ -32,7 +32,7 @@ export function CustomerWorkspaces({ customers, currentId, language, loading, on
 
   return <section className="panel customer-directory workspace-directory">
     <header className="workspace-directory-heading">
-      <h2>{copy("Customer workspaces", "客户工作区")}</h2>
+      <div className="workspace-directory-title"><h2>{copy("Customer workspaces", "客户工作区")}</h2><span className="directory-count">{customers.length}</span></div>
       <input type="search" aria-label={copy("Search customers", "搜索客户")} placeholder={copy("Search name or code", "搜索名称或代码")} value={search} onChange={(event) => setSearch(event.target.value)} />
     </header>
     {draft && <form ref={editor} className="workspace-editor customer-form" onSubmit={save}>
