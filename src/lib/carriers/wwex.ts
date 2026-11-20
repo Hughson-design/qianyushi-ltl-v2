@@ -188,7 +188,10 @@ export async function getWwexBolDocument(productTransactionId: string) {
     body: JSON.stringify({ request: { downloadMode: "SINGLE", docTypes: ["BILL_OF_LADING"], transactionType: "LTL", referenceMap: { PRODUCT_TRANSACTION_ID: productTransactionId } } }),
     cache: "no-store",
   });
-  if (!response.ok) return null;
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    throw new Error("WWEX document lookup failed. Verify the existing shipment before booking.");
+  }
   const data = await response.json();
   const securedLink = Array.isArray(data?.response?.securedLinks) ? String(data.response.securedLinks[0] || "") : "";
   const fileContent = typeof data?.response?.fileContent === "string" ? data.response.fileContent : "";
@@ -212,7 +215,7 @@ export async function getWwexPickupIdByBol(bolNumber: string) {
   return shipment?.pickupProductTransactionId ? String(shipment.pickupProductTransactionId) : null;
 }
 
-export async function dispatchWwexShipment(quote: StoredQuote): Promise<ShipmentBookingResult> {
+export async function dispatchWwexShipment(quote: StoredQuote, reconcileOnly = false): Promise<ShipmentBookingResult> {
   if (quote.freight_items.some((item) => item.hazmat)) {
     throw new Error("Hazmat BOL requires additional hazardous-material details.");
   }
@@ -221,8 +224,11 @@ export async function dispatchWwexShipment(quote: StoredQuote): Promise<Shipment
   if (!productTransactionId || !offerId) throw new Error("The WWEX quote reference is missing or expired. Request new rates.");
   const existingDocument = await getWwexBolDocument(productTransactionId);
   if (existingDocument) {
-    return { shipmentId: productTransactionId, pickupId: null, bolNumber: existingDocument.bolNumber, bolUrl: `/api/quotes/${quote.id}/document`, documentRef: productTransactionId };
+    const existingPickup = await getWwexPickupIdByBol(existingDocument.bolNumber);
+    if (!existingPickup) throw new Error("WWEX BOL exists but pickup is not confirmed. Keep the reservation pending.");
+    return { shipmentId: productTransactionId, pickupId: existingPickup, bolNumber: existingDocument.bolNumber, bolUrl: `/api/quotes/${quote.id}/document`, documentRef: productTransactionId };
   }
+  if (reconcileOnly) throw new Error("WWEX documents are not ready. Keep the reservation pending for manual reconciliation.");
   const token = await getToken();
   const address = (party: ShipmentParty, type: "SENDER" | "RECEIVER") => ({ address: { addressLineList: [party.address1, party.address2].filter(Boolean), locality: party.city, region: party.state, postalCode: party.zip, countryCode: "US", companyName: party.company, phone: party.phone, contactList: [contact(party, type)] } });
   const deliveryInstructions = quote.receiver.deliveryStartTime && quote.receiver.deliveryEndTime
@@ -242,9 +248,11 @@ export async function dispatchWwexShipment(quote: StoredQuote): Promise<Shipment
   const bolFromFile = typeof documentRef === "string" ? documentRef.match(/(NUD\d+)/i)?.[1] : null;
   const downloadedDocument = bolValue || bolFromFile ? null : await getWwexBolDocument(productTransactionId);
   const bolNumber = String(bolValue || bolFromFile || downloadedDocument?.bolNumber || "");
-  if (!bolNumber) throw new Error("WWEX created the shipment but its BOL is not available yet. Wait a moment and click Generate BOL again; the existing shipment will be recovered without creating a duplicate.");
+  if (!bolNumber) throw new Error("WWEX created the shipment but its BOL is not available yet. The reservation remains pending. Ask an administrator to reconcile it; do not submit another booking.");
+  const confirmedPickupId = pickupId ? String(pickupId) : await getWwexPickupIdByBol(bolNumber);
+  if (!confirmedPickupId) throw new Error("WWEX created the shipment but pickup is not confirmed. Keep the reservation pending.");
   const bolUrl = downloadedDocument ? `/api/quotes/${quote.id}/document` : typeof url === "string" && /^https?:/i.test(url) ? url : `/api/quotes/${quote.id}/document`;
-  return { shipmentId: productTransactionId, pickupId: pickupId ? String(pickupId) : null, bolNumber, bolUrl, documentRef: documentRef ? String(documentRef) : productTransactionId };
+  return { shipmentId: productTransactionId, pickupId: confirmedPickupId, bolNumber, bolUrl, documentRef: documentRef ? String(documentRef) : productTransactionId };
 }
 
 export async function cancelWwexShipment(shipmentId: string, pickupId: string | null) {

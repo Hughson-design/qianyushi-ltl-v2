@@ -22,7 +22,7 @@
 
 1. 在 **Customers → Add login user（添加登录用户）**，从 **Customer** 下拉框选择所属公司。
 2. 填写 **Name**、**Email** 和 **Temporary password**。每位用户使用自己的邮箱。
-3. 在 **Role（角色）** 选择权限。外部客户选 **Customer**。内部员工根据职责选择 **Sales**、**Operations** 或 **Admin**。Admin 和 Operations 可以进入客户和用户管理。
+3. 在 **Role（角色）** 选择权限。外部客户选 **Customer**。内部员工根据职责选择 **Sales**、**Operations** 或 **Admin**。只有 Admin 可以跨客户管理；客户管理员仅能管理本公司的用户。Operations 不具有总管理员权限。
 4. 点击 **Create login user（创建登录用户）**，在该客户的 **Login users（登录用户）** 下确认邮箱和角色。
 5. 把 [登录网址](https://qianyushi-ltl-v2.vercel.app/) 和登录邮箱给用户，密码通过单独的安全渠道交付。手机用户可以打开 [快速询价页](https://qianyushi-ltl-v2.vercel.app/quick-quote)，用同一邮箱和密码登录。
 

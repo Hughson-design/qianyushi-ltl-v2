@@ -16,10 +16,14 @@ type QuoteOffer = {
   shipment: RatedShipment;
 };
 
-function sign(purpose: string, value: string) {
-  const secret = process.env.SUPABASE_SECRET_KEY;
+function sign(purpose: string, value: string, secret = process.env.QUOTE_SIGNING_KEY || process.env.SUPABASE_SECRET_KEY) {
   if (!secret) throw new Error("Quote verification is not configured.");
   return createHmac("sha256", secret).update(purpose).update("\0").update(value).digest("base64url");
+}
+
+function verifySignature(signature: unknown, purpose: string, value: string) {
+  const secrets = [process.env.QUOTE_SIGNING_KEY || process.env.SUPABASE_SECRET_KEY, process.env.QUOTE_PREVIOUS_SIGNING_KEY || (process.env.QUOTE_SIGNING_KEY ? process.env.SUPABASE_SECRET_KEY : undefined)];
+  return secrets.filter((secret): secret is string => Boolean(secret)).some(secret => matches(signature, sign(purpose, value, secret)));
 }
 
 function matches(signature: unknown, expected: string) {
@@ -36,7 +40,7 @@ export function issueQuoteToken(customerId: string, rate: NormalizedRate, shipme
 export function readQuoteToken(token: unknown, customerId: string): QuoteOffer | null {
   if (typeof token !== "string" || token.length > 128_000) return null;
   const [payload, signature, extra] = token.split(".");
-  if (!payload || extra !== undefined || !matches(signature, sign("quote-offer-v1", payload))) return null;
+  if (!payload || extra !== undefined || !verifySignature(signature, "quote-offer-v1", payload)) return null;
   try {
     const offer: QuoteOffer = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
     if (offer.customerId !== customerId || offer.expiresAt <= Date.now()) return null;
@@ -47,10 +51,10 @@ export function readQuoteToken(token: unknown, customerId: string): QuoteOffer |
   }
 }
 
-export function shipmentProof(id: string, customerId: string) {
-  return sign("saved-shipment-v1", JSON.stringify([id, customerId]));
+export function shipmentProof(id: string, customerId: string, expiresAt?: number | string) {
+  return sign("saved-shipment-v2", JSON.stringify([id, customerId, Number(expiresAt)]));
 }
 
-export function verifyShipmentProof(proof: unknown, id: string, customerId: string) {
-  return matches(proof, shipmentProof(id, customerId));
+export function verifyShipmentProof(proof: unknown, id: string, customerId: string, expiresAt?: number | string) {
+  return Number.isFinite(Number(expiresAt)) && verifySignature(proof, "saved-shipment-v2", JSON.stringify([id, customerId, Number(expiresAt)]));
 }

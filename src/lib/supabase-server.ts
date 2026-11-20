@@ -33,8 +33,10 @@ export async function responseError(response: Response, fallback: string) {
   const text = await response.text();
   try {
     const data = JSON.parse(text);
-    return String(data.message || data.error || fallback);
+    const message = String(data.message || data.error || "");
+    const allowed = ["Insufficient deposit balance", "Only a draft quote can generate a BOL", "Quote not found", "Only a booked shipment can be voided", "Adjustment would make the deposit balance negative"];
+    return allowed.includes(message) ? message : fallback;
   } catch {
-    return text || fallback;
+    return fallback;
   }
 }

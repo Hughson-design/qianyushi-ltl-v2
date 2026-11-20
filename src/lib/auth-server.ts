@@ -39,7 +39,7 @@ export async function authSchemaStatus() {
   if (!response.ok) {
     const detail = await response.text();
     if (response.status === 404 || detail.includes("app_users")) return { ready: false, hasUsers: false };
-    throw new Error(detail || "Unable to check authentication setup.");
+    throw new Error("Unable to check authentication setup.");
   }
   const rows = await response.json();
   return { ready: true, hasUsers: rows.length > 0 };
@@ -90,7 +90,7 @@ export async function setAuthCookies(accessToken: string, refreshToken: string, 
   const store = await cookies();
   store.delete(ACTIVE_CUSTOMER_COOKIE);
   const secure = process.env.NODE_ENV === "production";
-  store.set(ACCESS_COOKIE, accessToken, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: Math.max(60, expiresIn) });
+  store.set(ACCESS_COOKIE, accessToken, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
   store.set(REFRESH_COOKIE, refreshToken, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
 }
 
@@ -99,6 +99,38 @@ export async function clearAuthCookies() {
   store.delete(ACCESS_COOKIE);
   store.delete(REFRESH_COOKIE);
   store.delete(ACTIVE_CUSTOMER_COOKIE);
+}
+
+export async function signOutSession() {
+  await getAppSession();
+  const token = (await cookies()).get(ACCESS_COOKIE)?.value;
+  const session = token ? tokenSession(token) : null;
+  if (session && token) {
+    // Compare-and-clear: an old browser must never clear a newer login.
+    const user = await supabaseAuth("user", undefined, token);
+    if (user.ok && (await user.json()).id === session.userId) {
+      const cleared = await supabaseRequest(`app_users?user_id=eq.${encodeURIComponent(session.userId)}&active_session_id=eq.${encodeURIComponent(session.sessionId)}`, { method: "PATCH", body: JSON.stringify({ active_session_id: null }) });
+      if (!cleared.ok) throw new Error("Unable to end the server session. Please try signing out again.");
+      const revoked = await supabaseAuth("logout?scope=local", { method: "POST" }, token);
+      if (!revoked.ok && ![401, 403, 404].includes(revoked.status)) throw new Error("Workspace access ended, but authentication sign-out needs a retry.");
+    }
+  }
+  await clearAuthCookies();
+}
+
+type Refreshed = { access_token: string; refresh_token: string; user?: { id?: string } };
+const refreshing = new Map<string, { expires: number; value: Promise<Refreshed | null> }>();
+async function refreshSession(refreshToken: string): Promise<Refreshed | null> {
+  const now = Date.now();
+  for (const [key, value] of refreshing) if (value.expires <= now) refreshing.delete(key);
+  const pending = refreshing.get(refreshToken);
+  if (pending) return pending.value;
+  const value = (async () => {
+    const response = await supabaseAuth("token?grant_type=refresh_token", { method: "POST", body: JSON.stringify({ refresh_token: refreshToken }) });
+    return response.ok ? await response.json() as Refreshed : null;
+  })();
+  if (refreshing.size < 1000) refreshing.set(refreshToken, { expires: now + 10_000, value });
+  return value;
 }
 
 async function profileForUser(userId: string) {
@@ -116,10 +148,28 @@ export async function getAppSession(): Promise<AppSession | null> {
   if (!schema.hasUsers) return null;
 
   const store = await cookies();
-  const accessToken = store.get(ACCESS_COOKIE)?.value;
+  let accessToken = store.get(ACCESS_COOKIE)?.value;
+  let userResponse = accessToken ? await supabaseAuth("user", undefined, accessToken) : null;
+  if (!userResponse?.ok) {
+    // Retry only expired/absent authentication, never upstream outages.
+    if (userResponse && userResponse.status !== 401 && userResponse.status !== 403) return null;
+    const refreshToken = store.get(REFRESH_COOKIE)?.value;
+    if (!refreshToken) return null;
+    const refreshed = await refreshSession(refreshToken);
+    if (!refreshed?.access_token || !refreshed.refresh_token) return null;
+    const renewed = tokenSession(refreshed.access_token);
+    if (!renewed) return null;
+    const profile = await profileForUser(renewed.userId);
+    // Never reactivate a session displaced by another device or by sign-out.
+    if (!profile?.active || profile.active_session_id !== renewed.sessionId) return null;
+    accessToken = refreshed.access_token;
+    userResponse = await supabaseAuth("user", undefined, accessToken);
+    if (!userResponse.ok) return null;
+    const secure = process.env.NODE_ENV === "production";
+    store.set(ACCESS_COOKIE, accessToken, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
+    store.set(REFRESH_COOKIE, refreshed.refresh_token, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30 });
+  }
   if (!accessToken) return null;
-  const userResponse = await supabaseAuth("user", undefined, accessToken);
-  if (!userResponse.ok) return null;
   const authUser = await userResponse.json();
   const profile = await profileForUser(String(authUser.id || ""));
   const homeCustomer = Array.isArray(profile?.customers) ? profile.customers[0] : profile?.customers;
@@ -180,6 +230,6 @@ export function customerFilter(session: AppSession) {
 }
 
 export async function authResponseError(response: Response, fallback: string) {
-  const detail = await responseError(response, fallback);
-  return detail.toLowerCase().includes("invalid login") ? "Incorrect email or password." : detail;
+  const detail = await response.json().catch(() => ({}));
+  return detail.code === "invalid_credentials" || String(detail.msg || detail.message || "").toLowerCase().includes("invalid login") ? "Incorrect email or password." : fallback;
 }

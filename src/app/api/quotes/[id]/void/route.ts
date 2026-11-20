@@ -16,10 +16,12 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
   try {
     const auth = await requireAppSession();
     if (auth.response || !auth.session) return auth.response;
+    if (!auth.session.canSelfBook) return NextResponse.json({ error: "This account must ask an administrator to cancel shipments." }, { status: 403 });
     const response = await supabaseRequest(`saved_quotes?select=*&id=eq.${encodeURIComponent(id)}&limit=1${customerFilter(auth.session)}`);
     if (!response.ok) throw new Error(await responseError(response, "Unable to load this shipment."));
     const quote: BookedQuote | undefined = (await response.json())[0];
     if (!quote) return NextResponse.json({ error: "Shipment not found." }, { status: 404 });
+    if (quote.provider === "priority1" && quote.provider_ref?.bookingVersion !== 2) return NextResponse.json({ error: "This Priority1 shipment predates safe booking references. Ask an administrator to verify ownership and cancel it with Priority1 directly." }, { status: 409 });
     if (quote.status === "void") return NextResponse.json({ quote });
     if (quote.status !== "booked" || !quote.provider_shipment_id) return NextResponse.json({ error: "Only a booked shipment can be voided." }, { status: 409 });
 

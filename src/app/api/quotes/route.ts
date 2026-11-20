@@ -4,6 +4,7 @@ import { readQuoteToken, shipmentProof } from "@/lib/quote-integrity";
 import { supabaseRequest } from "@/lib/supabase-server";
 import { customerFilter, requireAppSession } from "@/lib/auth-server";
 import { formatPhoneNumber } from "@/lib/phone";
+import { bookingParty } from "@/lib/booking-safety";
 
 export const runtime = "nodejs";
 
@@ -37,6 +38,12 @@ export async function POST(request: Request) {
     const offer = readQuoteToken(body?.rate?.quoteToken, customerId);
     if (!offer) return NextResponse.json({ error: "Get fresh rates before saving this quote." }, { status: 400 });
     const { rate, shipment } = offer;
+    let sender, receiver;
+    try {
+      sender = bookingParty(body.sender); receiver = bookingParty(body.receiver);
+      if (typeof body.reference !== "string" || !body.reference.trim() || body.reference.length > 300 || /[\x00-\x1f]/.test(body.reference)) throw new Error("Enter a reference of 1 to 300 characters.");
+      if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(body.pickupReadyTime || "09:00") || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(body.pickupCloseTime || "16:00") || (body.pickupCloseTime || "16:00") <= (body.pickupReadyTime || "09:00")) throw new Error("Enter valid pickup hours.");
+    } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Complete shipment contacts." }, { status: 400 }); }
     const deliveryStartTime = body.receiver?.deliveryStartTime ?? "08:00";
     const deliveryEndTime = body.receiver?.deliveryEndTime ?? "17:00";
     const validTime = (value: unknown) => typeof value === "string" && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
@@ -58,7 +65,7 @@ export async function POST(request: Request) {
       id,
       quote_number: quoteNumber,
       status: "draft",
-      reference: String(body.reference),
+      reference: body.reference.trim(),
       origin_zip: shipment.originZip,
       destination_zip: shipment.destinationZip,
       ready_date: shipment.readyDate,
@@ -67,11 +74,11 @@ export async function POST(request: Request) {
       transit: rate.transitDays === null ? "Not provided" : `${rate.transitDays} ${rate.transitDays === 1 ? "day" : "days"}`,
       price: rate.price,
       provider: rate.provider,
-      provider_ref: { ...rate.providerRef, shipmentProof: shipmentProof(id, customerId) },
+      provider_ref: { ...rate.providerRef, bookingVersion: 2, offerExpiresAt: offer.expiresAt, shipmentProof: shipmentProof(id, customerId, offer.expiresAt) },
       freight_items: shipment.items,
       services: shipment.services,
-      sender: { ...body.sender, phone: formatPhoneNumber(String(body.sender.phone || "")) },
-      receiver: { ...body.receiver, phone: formatPhoneNumber(String(body.receiver.phone || "")), deliveryStartTime, deliveryEndTime },
+      sender,
+      receiver: { ...receiver, deliveryStartTime, deliveryEndTime },
       skip_address_verification: Boolean(body.skipAddressVerification),
       pickup_ready_time: body.pickupReadyTime || "09:00",
       pickup_close_time: body.pickupCloseTime || "16:00",

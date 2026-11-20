@@ -36,7 +36,11 @@ export async function GET() {
     const response = await supabaseRequest("platform_settings?select=*&id=eq.true&limit=1");
     if (!response.ok) return settingsStorageError(response, "Unable to load settings.");
     const rows = await response.json();
-    return NextResponse.json({ settings: { ...defaults, ...(rows[0] || {}) } });
+    const settings = { ...defaults, ...(rows[0] || {}) };
+    if (auth.session.role !== "admin") {
+      return NextResponse.json({ settings: Object.fromEntries(["company_name", "contact_name", "email", "phone", "default_ready_time", "default_close_time"].map(key => [key, settings[key]])) }, { headers: { "Cache-Control": "no-store" } });
+    }
+    return NextResponse.json({ settings }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to load settings." }, { status: 500 });
   }

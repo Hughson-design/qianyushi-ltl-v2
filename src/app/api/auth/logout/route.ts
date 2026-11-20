@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { clearAuthCookies } from "@/lib/auth-server";
+import { signOutSession } from "@/lib/auth-server";
 
 export async function POST() {
-  await clearAuthCookies();
-  return NextResponse.json({ signedOut: true });
+  try {
+    await signOutSession();
+    return NextResponse.json({ signedOut: true });
+  } catch { return NextResponse.json({ error: "Unable to complete sign-out. Please try again." }, { status: 503 }); }
 }

@@ -110,12 +110,22 @@ pnpm start
 7. `outputs/supabase-complete-sidebar-features.sql`
 8. `outputs/supabase-correct-qianyushi-name.sql`
 9. `outputs/supabase-enable-tql.sql`
+10. `outputs/supabase-enable-address-categories.sql`
+11. `outputs/supabase-enable-dual-address-category.sql`
+12. `outputs/supabase-enable-single-session.sql`
+13. `outputs/supabase-enable-customer-admin.sql`
+14. `outputs/supabase-enable-login-email-change.sql`
+15. `outputs/supabase-enable-quote-input-history.sql`
+16. `outputs/supabase-add-quote-input-username.sql`
+17. `outputs/supabase-enable-mothership-settings.sql`
+18. `outputs/supabase-fix-booking-attempt-ledger.sql`
+19. `outputs/supabase-security-hardening.sql`
 
 这些脚本使用 `IF NOT EXISTS` 或兼容性修改为主，但生产环境执行前仍应备份数据库。完整说明见 [Supabase 部署说明](docs/SUPABASE-SETUP.md)。
 
 ## 首次管理员
 
-数据库 SQL 完成且 `app_users` 为空时，首页会显示首次管理员创建界面。创建后即可登录。管理员和 Operations 用户可以管理客户、用户、押金、平台设置，并切换当前操作客户。
+数据库 SQL 完成且 `app_users` 为空时，首页会显示首次管理员创建界面。创建后即可登录。总管理员可以管理客户、用户、押金、平台设置，并切换当前操作客户。
 
 ## 环境变量
 
@@ -157,7 +167,7 @@ pnpm start
 - WWEX/ESTES 沙盒已成功返回 BOL 并安排 Pickup。
 - Priority1/ABF 沙盒已成功返回 BOL `60016048142` 与 Pickup `WWW0000000`。
 - Priority1 Reference 查重确认同一 Reference 只有一票运单。
-- TQL 适配器已通过类型检查和正式构建；真实 API 验收等待 TQL 生产凭据及批准的测试时段。
+- TQL 生产认证和报价已验证；真实 Tender、取消及资金核对仍需单独批准的验收，不等同于已完成真实出单测试。
 - R&L 沙盒曾出现承运商在服务器端创建运单、但响应字段异常的情况；当前版本已在重试前查询 Reference，并可在只有一条且 BOL/Pickup 齐全时恢复该结果。
 
 ## 详细文档
@@ -180,3 +190,5 @@ pnpm start
 生产上线前必须换成生产 API 地址与密钥，并使用小额、可撤销测试单逐家承运商验收。
 
 TQL 当前没有提供取消 API。TQL 运单必须先联系 TQL 人工取消，系统不会在承运商取消前自动退款。
+
+安全状态机、待核对运单操作及数据库验证见 [安全修复说明](docs/SECURITY-HARDENING.md)。

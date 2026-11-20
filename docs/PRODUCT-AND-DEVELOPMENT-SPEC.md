@@ -22,7 +22,7 @@
 QIANYUSHI LTL V2 是面向美国 LTL 运输的轻量客户自助平台。核心目标只有四个：
 
 1. 客户快速填写或粘贴运输资料。
-2. 系统从 WWEX 和 Priority1 获取多承运商报价。
+2. 系统从 WWEX、Priority1、TQL 获取多承运商报价；Mothership 当前仅用于比价。
 3. 客户或操作人员保存报价并生成 BOL，同时预约 Pickup。
 4. 通过预存押金控制客户是否可以出单，并记录扣款或退款。
 
@@ -84,7 +84,7 @@ QIANYUSHI LTL V2 是面向美国 LTL 运输的轻量客户自助平台。核心�
 
 ### 4.2 Operations
 
-当前后端把 Operations 视为管理型角色，可使用管理员接口并切换客户。适合日常操作人员。
+Operations 为所属客户内的操作角色，不具有总管理员接口权限，也不能切换其他客户。跨客户管理只允许 Admin。
 
 ### 4.3 Sales
 
@@ -102,7 +102,7 @@ QIANYUSHI LTL V2 是面向美国 LTL 运输的轻量客户自助平台。核心�
 
 - `saved_quotes`、`address_book`、`deposit_accounts` 和 `deposit_transactions` 按 `customer_id` 隔离。
 - 普通客户会话始终绑定自己的客户。
-- Admin/Operations 可以通过安全 Cookie 选择另一个有效客户。
+- Admin 可以通过安全 Cookie 选择另一个有效客户。
 - 服务端查询必须使用当前会话的 `customer_id` 过滤，不能依赖浏览器提交的客户 ID。
 
 ## 5. 核心业务流程
@@ -625,13 +625,13 @@ Shipment、Party 和 Provider Reference 使用 JSONB，便于适配多个承运�
 | `/api/addresses` | GET/POST | 地址簿列表/新增 | 已登录 |
 | `/api/addresses/[id]` | PATCH/DELETE | 地址修改/删除 | 已登录 |
 | `/api/deposit` | GET | 余额与流水 | 已登录 |
-| `/api/deposit` | POST | 管理员调整押金 | Admin/Operations |
-| `/api/customers` | GET/POST | 客户列表/新增 | Admin/Operations |
-| `/api/customers/[id]` | PATCH/DELETE | 客户更新/删除 | Admin/Operations |
-| `/api/customers/select` | POST | 切换当前客户 | Admin/Operations |
-| `/api/users` | POST | 新建登录用户 | Admin/Operations |
-| `/api/users/[id]` | PATCH/DELETE | 用户、密码或删除 | Admin/Operations |
-| `/api/settings` | GET/POST | 读取/保存设置 | Admin/Operations |
+| `/api/deposit` | POST | 管理员调整押金 | Admin |
+| `/api/customers` | GET/POST | 客户列表/新增 | Admin |
+| `/api/customers/[id]` | PATCH/DELETE | 客户更新/删除 | Admin |
+| `/api/customers/select` | POST | 切换当前客户 | Admin |
+| `/api/users` | POST | 新建登录用户 | Admin / 本公司 Customer Admin |
+| `/api/users/[id]` | PATCH/DELETE | 用户、密码或删除 | Admin / 本公司 Customer Admin |
+| `/api/settings` | GET/POST | GET 按角色裁剪，POST 保存设置 | GET 已登录 / POST Admin |
 
 ## 12. 错误处理与恢复
 
@@ -643,9 +643,9 @@ Shipment、Party 和 Provider Reference 使用 JSONB，便于适配多个承运�
 ### 12.2 BOL 请求超时或响应异常
 
 - 不允许假定失败等于“承运商未创建”。
-- Priority1 必须按 Reference 查询。
+- Priority1 使用完整 Quote UUID 生成 35 字符唯一标识；不得用用户 PO 查重，恢复时必须核对返回的 CUSTOMER_REFERENCE。
 - WWEX 必须按 Product Transaction/Document 查询。
-- 存在一条完整记录时恢复。
+- 只有匹配系统标识且完整的记录才可恢复；异常保留 booking 和资金预留，不自动退款。管理员的“核对已有运单”仅查询，不创建、不再次扣款。
 - 多条或不完整记录时停止并人工处理。
 
 ### 12.3 数据库最终写入失败
@@ -713,11 +713,11 @@ Shipment、Party 和 Provider Reference 使用 JSONB，便于适配多个承运�
 6. 危险品只能报价标记，不能出 BOL。
 7. Priority1 恢复既有记录时可能没有可下载的 BOL URL。
 8. Orders 尚无 Tracking/POD，这是产品范围决定，不是遗漏。
-9. 地址数据是 ZIP/City 数据，不是 USPS/CASS 地址验证。
+9. ZIP/City 数据用于路线补全；可选 Google 地址验证仅用于未明确类型的收货地址。
 10. 当前 Quote/Order/Deposit 列表没有服务端分页。
-11. 缺少自动化单元测试与集成测试套件，目前以 TypeScript、Build 和人工沙盒验收为主。
+11. tests/ 已包含识别、TQL 认证、客户隔离及安全状态机的模拟测试；真实承运商出单和取消验收需要单独授权。
 12. 没有专门的审计日志表记录客户/用户/设置修改。
-13. 没有 Rate Expiration 字段和过期强制重新询价机制。
+13. 新草稿在 provider_ref 中持久保存并签名 offerExpiresAt；过期禁止出单，旧草稿必须先核对历史承运商记录再重新询价。
 
 ## 16. 后续开发建议顺序
 

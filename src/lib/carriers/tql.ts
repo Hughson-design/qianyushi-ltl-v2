@@ -214,12 +214,13 @@ function partyDetails(party: ShipmentParty, hoursOpen: string, hoursClose: strin
 async function getTenderedPoNumber(quoteId: number) {
   const config = configuration();
   const response = await fetch(`${config.apiBase}/quotes/${quoteId}`, { headers: await headers(), cache: "no-store" });
-  if (!response.ok) return null;
-  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error("TQL existing-tender lookup failed. Verify the shipment before booking.");
+  const data = await response.json();
+  if (!data?.content || typeof data.content !== "object" || Array.isArray(data.content)) throw new Error("TQL existing-tender response was invalid. Verify before booking.");
   return data?.content?.poNumber ? String(data.content.poNumber) : null;
 }
 
-export async function dispatchTqlShipment(quote: StoredQuote): Promise<ShipmentBookingResult> {
+export async function dispatchTqlShipment(quote: StoredQuote, reconcileOnly = false): Promise<ShipmentBookingResult> {
   if (quote.freight_items.some((item) => item.hazmat)) {
     throw new Error("TQL hazmat BOL requires UN number, shipping name, hazard class, packing group, and emergency contact.");
   }
@@ -232,6 +233,7 @@ export async function dispatchTqlShipment(quote: StoredQuote): Promise<ShipmentB
     return { shipmentId: existingPoNumber, pickupId: null, bolNumber: existingPoNumber, bolUrl: null, documentRef: "email" };
   }
 
+  if (reconcileOnly) throw new Error("No completed TQL tender was found. Keep the reservation pending for manual reconciliation.");
   const bolEmail = process.env.TQL_BOL_EMAIL || quote.sender.email || quote.receiver.email;
   if (!bolEmail) throw new Error("Add TQL_BOL_EMAIL or a sender email before generating the TQL BOL.");
   const config = configuration();

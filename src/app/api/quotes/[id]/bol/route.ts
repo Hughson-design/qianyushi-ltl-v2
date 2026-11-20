@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { verifyShipmentProof } from "@/lib/quote-integrity";
+import { validateBooking } from "@/lib/booking-safety";
 
 import { dispatchPriority1Shipment } from "@/lib/carriers/priority1";
-import type { StoredQuote } from "@/lib/carriers/shipment-types";
 import { dispatchTqlShipment } from "@/lib/carriers/tql";
+import type { StoredQuote } from "@/lib/carriers/shipment-types";
 import { dispatchWwexShipment } from "@/lib/carriers/wwex";
 import { responseError, supabaseRequest, supabaseRpc } from "@/lib/supabase-server";
 import { AppSession, customerFilter, requireAppSession } from "@/lib/auth-server";
@@ -17,37 +18,41 @@ async function loadQuote(id: string, session: AppSession): Promise<StoredQuote |
   return rows[0] || null;
 }
 
-export async function POST(_request: Request, context: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ error: "Invalid quote ID." }, { status: 400 });
   try {
     const auth = await requireAppSession();
     if (auth.response || !auth.session) return auth.response;
     if (!auth.session.canSelfBook) return NextResponse.json({ error: "This customer account is not allowed to generate BOLs." }, { status: 403 });
+    const reconcile = new URL(request.url).searchParams.get("reconcile") === "true";
+    if (reconcile && auth.session.role !== "admin") return NextResponse.json({ error: "Administrator access is required for reconciliation." }, { status: 403 });
     const quote = await loadQuote(id, auth.session);
     if (!quote) return NextResponse.json({ error: "Quote not found." }, { status: 404 });
     if (quote.status === "booked") return NextResponse.json({ quote });
-    if (quote.status !== "draft") return NextResponse.json({ error: "This quote cannot generate a BOL in its current status." }, { status: 409 });
+    if (quote.status !== (reconcile ? "booking" : "draft")) return NextResponse.json({ error: "This quote cannot generate a BOL in its current status. Pending bookings must be reconciled." }, { status: 409 });
+    if (quote.provider_ref?.bookingVersion !== 2) return NextResponse.json({ error: "This draft or pending booking predates safe booking identifiers. Ask an administrator to check carrier records before copying and requoting." }, { status: 409 });
 
-    if (!auth.session.customerId || !verifyShipmentProof(quote.provider_ref?.shipmentProof, id, auth.session.customerId)) {
+    if (!auth.session.customerId || !verifyShipmentProof(quote.provider_ref?.shipmentProof, id, auth.session.customerId, quote.provider_ref?.offerExpiresAt)) {
       return NextResponse.json({ error: "This draft predates verified pricing. Copy it and request fresh rates before booking." }, { status: 409 });
     }
 
+    if (!reconcile) {
+    if (!Number.isFinite(Number(quote.provider_ref.offerExpiresAt)) || Number(quote.provider_ref.offerExpiresAt) <= Date.now()) return NextResponse.json({ error: "This rate has expired. Copy the details and get fresh rates before booking." }, { status: 409 });
+    validateBooking(quote);
     const reserve = await supabaseRpc("reserve_quote_for_bol", auth.session.customerId
       ? { p_quote_id: id, p_customer_id: auth.session.customerId, p_actor_user_id: auth.session.userId }
       : { p_quote_id: id });
     if (!reserve.ok) return NextResponse.json({ error: await responseError(reserve, "Unable to reserve the deposit.") }, { status: 409 });
+    }
 
     let booking;
     try {
-      if (quote.provider === "priority1") booking = await dispatchPriority1Shipment(quote);
-      else if (quote.provider === "tql") booking = await dispatchTqlShipment(quote);
-      else booking = await dispatchWwexShipment(quote);
-    } catch (error) {
-      await supabaseRpc("release_quote_bol_reservation", auth.session.customerId
-        ? { p_quote_id: id, p_customer_id: auth.session.customerId, p_actor_user_id: auth.session.userId }
-        : { p_quote_id: id });
-      throw error;
+      if (quote.provider === "priority1") booking = await dispatchPriority1Shipment(quote, reconcile);
+      else if (quote.provider === "tql") booking = await dispatchTqlShipment(quote, reconcile);
+      else booking = await dispatchWwexShipment(quote, reconcile);
+    } catch {
+      return NextResponse.json({ reconciliationRequired: true, error: "Carrier booking is not confirmed. The deposit remains reserved and the quote remains pending. Do not create another shipment. Ask an administrator to reconcile carrier records." }, { status: 409 });
     }
 
     const complete = await supabaseRpc("complete_quote_bol", {

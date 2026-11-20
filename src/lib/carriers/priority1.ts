@@ -1,4 +1,5 @@
 import "server-only";
+import { priority1BookingReference } from "../booking-safety";
 
 import type { NormalizedRate, QuoteRequest } from "./types";
 import type { ShipmentBookingResult, StoredQuote } from "./shipment-types";
@@ -122,14 +123,14 @@ function priority1Error(data: unknown, status: number) {
   return `Priority1 dispatch returned HTTP ${status}.`;
 }
 
-export async function dispatchPriority1Shipment(quote: StoredQuote): Promise<ShipmentBookingResult> {
+export async function dispatchPriority1Shipment(quote: StoredQuote, reconcileOnly = false): Promise<ShipmentBookingResult> {
   if (quote.freight_items.some((item) => item.hazmat)) {
     throw new Error("Hazmat BOL requires UN number, shipping name, hazard class, and packing group.");
   }
 
   // Dispatch can create a shipment before returning a carrier-side error.
-  // Check the persisted customer reference before any retry to avoid duplicates.
-  const reference = quote.reference.trim().slice(0, 35);
+  // Use the full system quote ID, never a customer-supplied PO, for recovery.
+  const reference = priority1BookingReference(quote.id);
   if (!reference) throw new Error("A customer reference is required before generating a Priority1 BOL.");
   const existingResponse = await fetch(`${priority1Base()}/v2/ltl/shipments/status`, {
     method: "POST",
@@ -150,7 +151,7 @@ export async function dispatchPriority1Shipment(quote: StoredQuote): Promise<Shi
       const identifiers = shipment?.shipmentIdentifiers || [];
       const bolNumber = identifiers.find((identifier) => identifier.type === "BILL_OF_LADING")?.value;
       const pickupId = identifiers.find((identifier) => identifier.type === "PICKUP")?.value;
-      if (shipment?.id && bolNumber && pickupId) {
+      if (shipment?.id && bolNumber && pickupId && identifiers.some(identifier => identifier.type === "CUSTOMER_REFERENCE" && identifier.value === reference)) {
         return { shipmentId: String(shipment.id), pickupId, bolNumber, bolUrl: null, documentRef: null };
       }
       const bolNumbers = existing.shipments.flatMap((item: { shipmentIdentifiers?: { type: string; value: string }[] }) =>
@@ -159,6 +160,7 @@ export async function dispatchPriority1Shipment(quote: StoredQuote): Promise<Shi
     }
   }
 
+  if (reconcileOnly) throw new Error("No matching completed Priority1 shipment was found. Keep the reservation pending for manual reconciliation.");
   const transitDays = Number.parseInt(quote.transit, 10) || 3;
   const response = await fetch(`${priority1Base()}/v2/ltl/shipments/dispatch`, {
     method: "POST",

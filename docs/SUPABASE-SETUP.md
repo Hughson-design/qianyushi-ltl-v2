@@ -32,6 +32,17 @@
 6. `outputs/supabase-enable-settings.sql`
 7. `outputs/supabase-complete-sidebar-features.sql`
 8. `outputs/supabase-correct-qianyushi-name.sql`
+9. `outputs/supabase-enable-tql.sql`
+10. `outputs/supabase-enable-address-categories.sql`
+11. `outputs/supabase-enable-dual-address-category.sql`
+12. `outputs/supabase-enable-single-session.sql`
+13. `outputs/supabase-enable-customer-admin.sql`
+14. `outputs/supabase-enable-login-email-change.sql`
+15. `outputs/supabase-enable-quote-input-history.sql`
+16. `outputs/supabase-add-quote-input-username.sql`
+17. `outputs/supabase-enable-mothership-settings.sql`
+18. `outputs/supabase-fix-booking-attempt-ledger.sql`
+19. `outputs/supabase-security-hardening.sql`
 
 为什么要按顺序：
 
@@ -202,7 +213,7 @@ order by a.customer_id;
 ### 无法调整押金
 
 - 检查 Login/Customers 和 Sidebar SQL 是否都成功。
-- 检查当前账号是否 Admin/Operations。
+- 检查当前账号是否 Admin。
 - 检查当前是否已经选择一个客户。
 - 检查负数调整是否会使余额小于 0。
 

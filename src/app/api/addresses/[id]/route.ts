@@ -25,7 +25,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const response = await supabaseRequest(`address_book?id=eq.${encodeURIComponent(id)}${customerFilter(auth.session)}`, {
       method: "PATCH",
       headers: { Prefer: "return=representation" },
-      body: JSON.stringify({ ...address, ...(category === undefined ? {} : { category }), country: address.country || "United States", state: address.state.toUpperCase(), updated_at: new Date().toISOString() }),
+      body: JSON.stringify({ ...address, fingerprint: [address.company, address.address1, address.address2, address.zip].map(value => value.toLowerCase().replace(/\s+/g, " ")).join("|"), ...(category === undefined ? {} : { category }), country: address.country || "United States", state: address.state.toUpperCase(), updated_at: new Date().toISOString() }),
     });
     if (!response.ok) return NextResponse.json({ error: await responseError(response, "Unable to update this address.") }, { status: 502 });
     const rows = await response.json();
