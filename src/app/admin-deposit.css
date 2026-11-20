@@ -1,0 +1,56 @@
+.admin-deposit-overview { margin: 0 0 16px; padding: 17px; min-width: 0; }
+.deposit-overview-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.deposit-overview-heading h2 { margin: 0; font: 750 18px/1.4 Inter, ui-sans-serif, system-ui, sans-serif; overflow-wrap: anywhere; }
+.deposit-overview-heading p { margin: 4px 0 0; color: #64746b; font-size: 12px; line-height: 1.5; }
+.admin-deposit-overview button, .deposit-history-dialog button { border: 1px solid #ccdad2; border-radius: 6px; padding: 7px 11px; background: #fff; color: #176b4a; font: 700 12px/1.4 ui-sans-serif, system-ui, sans-serif; cursor: pointer; }
+.admin-deposit-overview button:disabled, .deposit-history-dialog button:disabled { opacity: .45; cursor: not-allowed; }
+.deposit-overview-search { margin: 14px 0; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.deposit-overview-search input { width: min(260px, 100%); min-width: 0; height: 34px; border: 1px solid #ccd9d1; border-radius: 6px; padding: 7px 10px; font: inherit; font-size: 12px; }
+.deposit-overview-search small { color: #69796f; font-size: 11px; flex: 1 1 260px; line-height: 1.5; }
+.deposit-overview-scroll { max-width: 100%; overflow-x: auto; border: 1px solid #dce5df; border-radius: 8px; }
+.deposit-overview-table, .deposit-history-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
+.deposit-overview-table th, .deposit-history-table th { background: #edf4ef; color: #556c5e; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.deposit-overview-table th, .deposit-overview-table td, .deposit-history-table th, .deposit-history-table td { padding: 11px 12px; border-bottom: 1px solid #e0e8e2; }
+.deposit-overview-table tbody tr:last-child td, .deposit-history-table tbody tr:last-child td { border-bottom: 0; }
+.deposit-overview-table tbody tr:nth-child(even), .deposit-history-table tbody tr:nth-child(even) { background: #f8faf9; }
+.deposit-overview-table tbody tr { cursor: pointer; }
+.deposit-overview-table tbody tr:hover, .deposit-overview-table tbody tr:focus-visible { background: #eaf4ee; outline: 2px solid #80ad93; outline-offset: -2px; }
+.admin-deposit-overview .deposit-customer-name { border: 0; background: transparent; padding: 0; text-align: left; font-size: 12px; color: #254d39; }
+.deposit-overview-table td:first-child { min-width: 160px; max-width: 300px; overflow-wrap: anywhere; }
+.deposit-overview-table small, .deposit-history-table small { display: block; font-size: 11px; color: #6b7c71; margin-top: 3px; line-height: 1.5; overflow-wrap: anywhere; }
+.deposit-money { white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
+.deposit-overview-table th:nth-child(2), .deposit-overview-table th:nth-child(4), .deposit-history-table th:nth-last-child(-n+2) { text-align: right; }
+.deposit-balance { font-weight: 750; color: #176b4a; }
+.deposit-muted { color: #7a887e; font-weight: 400; }
+.deposit-view-hint { color: #176b4a; font-size: 11px; white-space: nowrap; }
+.deposit-overview-empty { padding: 24px 12px; color: #6b7b72; text-align: center; font-size: 12px; }
+.deposit-pagination { margin-top: 12px; display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.deposit-pagination span { margin-right: auto; font-size: 11px; color: #718075; }
+.deposit-sr-only { position: absolute; width: 1px; height: 1px; clip-path: inset(50%); overflow: hidden; }
+.deposit-history-dialog { padding: 0; border: 1px solid #d7e3db; border-radius: 14px; width: min(900px, calc(100vw - 24px)); max-height: 88vh; overflow-y: auto; background: white; color: #172e23; box-shadow: 0 24px 75px #122c2833; }
+.deposit-history-dialog::backdrop { background: #102b245c; backdrop-filter: blur(3px); }
+.deposit-history-content { padding: 22px; }
+.deposit-detail-balance { margin: 16px 0; padding: 12px 15px; background: #eff7f2; border-radius: 8px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; }
+.deposit-detail-balance > span { font-size: 12px; color: #557061; }
+.deposit-detail-balance strong { color: #176b4a; font-size: 22px; }
+.deposit-detail-balance small { flex-basis: 100%; font-size: 11px; color: #6b7b71; }
+.deposit-history-table { min-width: 590px; }
+.deposit-history-table td:nth-child(2) { min-width: 190px; max-width: 360px; overflow-wrap: anywhere; }
+.deposit-history-table td:first-child { white-space: nowrap; color: #63776a; font-size: 11px; }
+.deposit-history-table .deposit-credit { color: #176b4a; font-weight: 700; }
+.deposit-history-table .deposit-debit { color: #a84b3e; font-weight: 700; }
+.deposit-workspace-tools { margin-top: 16px; border: 1px solid #dce5df; border-radius: 9px; background: #fff; padding: 13px 16px; }
+.deposit-workspace-tools > summary { cursor: pointer; color: #375c46; font-size: 12px; font-weight: 700; }
+.deposit-workspace-tools:not(.admin-workspace-tools) { padding: 0; border: 0; background: transparent; }
+.deposit-workspace-tools:not(.admin-workspace-tools) > summary { display: none; }
+.deposit-workspace-tools.admin-workspace-tools .deposit-page-grid { margin-top: 14px; grid-template-columns: minmax(220px, .7fr) minmax(0, 1.3fr); }
+.deposit-workspace-tools .deposit-page-grid > .panel { min-width: 0; }
+@media(max-width:800px) { .deposit-workspace-tools.admin-workspace-tools .deposit-page-grid { grid-template-columns: minmax(0, 1fr); } }
+@media(max-width:600px) {
+  .admin-deposit-overview { padding: 12px; }
+  .deposit-overview-table { min-width: 580px; }
+  .deposit-history-content { padding: 15px; }
+  .deposit-overview-heading h2 { font-size: 16px; }
+  .deposit-pagination button { min-height: 38px; }
+  .deposit-overview-search input { flex: 1; font-size: 16px; }
+}
