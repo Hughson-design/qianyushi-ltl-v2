@@ -40,12 +40,15 @@
 #quote .route-grid-single-row .location-field, #quote .route-grid-single-row .ready-date-input { min-height: 38px; height: 38px; border-radius: 7px; }
 #quote .route-grid-single-row .route-line { height: 38px; }
 #quote .route-grid-single-row .location-field { gap: 6px; }
+#quote .route-grid-single-row .location-field button { font-size: 0; width: 25px; height: 26px; padding: 2px; border-radius: 5px; background: #edf5f0; }
+#quote .route-grid-single-row .location-field button::before { content: "⌂"; font-size: 18px; line-height: 1; }
 #quote .freight-item { padding: 9px; border-radius: 7px; background: #f8faf9; }
 #quote .freight-item + .freight-item { margin-top: 8px; }
 #quote .input-group input, #quote .input-group select { height: 36px; padding-inline: 7px; }
 #quote .input-group label { margin-bottom: 5px; font-size: 9px; letter-spacing: .025em; }
 #quote .field-with-unit input { padding-right: 23px; }
 #quote .field-with-unit span { top: 11px; right: 6px; font-size: 9px; }
+#quote .money-field input { padding-left: 24px; }
 #quote .line-index { min-height: 0; }
 #quote .line-index > div { height: 36px; }
 #quote .add-item { margin-top: 6px; padding-block: 5px; }
@@ -87,9 +90,10 @@
 .workspace-summary h3 { font-size: 12px; line-height: 1.45; }
 .workspace-summary header p { margin-top: 3px; font-size: 10px; }
 .workspace-summary .company-user-status { font-size: 10px; gap: 4px; }
-.workspace-summary dl { gap: 8px; padding: 8px 0; margin: 9px 0; }
+.workspace-summary dl { gap: 8px; padding: 7px 0; margin: 7px 0; }
+.workspace-summary dl > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 5px; }
 .workspace-summary dt { font-size: 10px; }
-.workspace-summary dd { margin-top: 2px; font-size: 13px; }
+.workspace-summary dd { margin-top: 0; font-size: 12px; }
 .workspace-summary footer { font-size: 10px; gap: 5px; }
 .workspace-card-actions { gap: 6px; }
 .workspace-card-actions > button { padding: 5px 7px; font-size: 11px; }

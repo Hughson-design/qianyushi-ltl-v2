@@ -1418,12 +1418,12 @@ export default function Home() {
               <div className="route-grid route-grid-single-row">
                 <div className="field-block">
                   <label>{tx("SHIP FROM")}</label>
-                  <div className="location-field"><span className="dot origin-dot" /><div><input value={origin} onChange={(e) => { setOrigin(e.target.value); invalidateRates(); }} aria-label="Origin ZIP" /><small>{originAddress}</small></div><button type="button" onClick={() => void openAddressBook("route-origin")}>{tx("Address book")}</button></div>
+                  <div className="location-field"><span className="dot origin-dot" /><div><input value={origin} onChange={(e) => { setOrigin(e.target.value); invalidateRates(); }} aria-label="Origin ZIP" /><small>{originAddress}</small></div><button type="button" title={tx("Address book")} onClick={() => void openAddressBook("route-origin")}>{tx("Address book")}</button></div>
                 </div>
                 <div className="route-line"><span>→</span></div>
                 <div className="field-block">
                   <label>{tx("SHIP TO")}</label>
-                  <div className="location-field"><span className="dot destination-dot" /><div><input value={destination} onChange={(e) => { clearDeliveryCheck(); setDestination(e.target.value); invalidateRates(); }} aria-label="Destination ZIP" /><small>{destinationAddress}</small></div><button type="button" onClick={() => void openAddressBook("route-destination")}>{tx("Address book")}</button></div>
+                  <div className="location-field"><span className="dot destination-dot" /><div><input value={destination} onChange={(e) => { clearDeliveryCheck(); setDestination(e.target.value); invalidateRates(); }} aria-label="Destination ZIP" /><small>{destinationAddress}</small></div><button type="button" title={tx("Address book")} onClick={() => void openAddressBook("route-destination")}>{tx("Address book")}</button></div>
                 </div>
                 <div className="field-block ready-field">
                   <label htmlFor="quote-ready-date">{tx("READY DATE (PT)")}</label>
