@@ -11,6 +11,22 @@ function load(path, names, globals = {}) {
 const parser = load('src/lib/smart-quote-parser.ts', ['parseSmartQuote']);
 const reader = load('src/lib/shipment-reader.ts', ['readerResult', 'readerExtension', 'readerInstructions', 'readerSchema', 'READER_MAX_BYTES', 'READER_MAX_FILES', 'READER_MAX_TEXT', 'READER_MIME'], parser);
 const text = '提货地址：91789\n收货地址：1251 E Walnut, Carson, CA 90746\n7 pallets, 7 pieces, 120*100*180 cm, 744 kg, commodity: Furniture';
+test('private address means residential, preserving separately stated delivery services', () => {
+  const base = '提货地址：91789\n收货地址：1251 E Walnut, Carson, CA 90746\n';
+  const freight = '1 pallet, 48*40*48 in, 500 lb';
+  const plain = parser.parseSmartQuote(base.replace('90746', '90746，私人地址') + freight);
+  assert.deepEqual([...plain.services], ['Residential delivery']);
+  assert.equal(plain.hasDeclaredDeliveryType, true);
+  assert.equal(plain.destinationAddress.includes('私人地址'), false);
+  const notes = parser.parseSmartQuote(base + '私人地址\n电话预约\n需尾板车\n' + freight);
+  for (const service of ['Residential delivery', 'Appointment delivery', 'Liftgate at delivery']) assert.ok(notes.services.includes(service));
+  assert.deepEqual([...notes.missing], []);
+  assert.equal(notes.services.includes('Residential pickup'), false);
+  const pickup = parser.parseSmartQuote(base.replace('91789', '91789，私人地址') + freight);
+  assert.ok(pickup.services.includes('Residential pickup'));
+  assert.equal(pickup.hasDeclaredDeliveryType, false);
+  assert.match(reader.readerInstructions, /私人地址.*explicit residential/);
+});
 function harness({ signedIn = true, key = '', payload, status = 200 } = {}) {
   const requests = [];
   const route = load('src/app/api/shipment-reader/route.ts', ['GET', 'POST'], {
@@ -91,4 +107,3 @@ test('uses verified workbook cargo instead of AI duplicating the shipment total 
   assert.equal(result.parsed.items[1].pallets, '4');
   assert.equal(result.parsed.items[0].packaging, 'Crate');
 });
-

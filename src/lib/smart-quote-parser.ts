@@ -27,16 +27,16 @@ export type SmartQuoteResult = {
 
 type TextMatch = RegExpMatchArray & { index: number };
 
-const originMarker = /(?:(?:商业|家庭|住宅)(?:有|无)卸货平台|(?:commercial|residential)\s+(?:with|without)\s+(?:a\s+)?loading\s+dock\s*)?(?:发货人?(?:地址)?|提货(?:地址|地)?|取货(?:地址|地)?|sender(?:\s*address)?|ship\s*from|pickup(?:\s*address)?)[：:]/i;
-const destinationMarker = /(?:(?:商业|家庭|住宅)(?:有|无)卸货平台|(?:commercial|residential)\s+(?:with|without)\s+(?:a\s+)?loading\s+dock\s*)?(?:收货人?(?:地址)?|派送(?:地址|地)?|送货(?:地址|地)?|receiver(?:\s*address)?|consignee(?:\s*address)?|ship\s*to|deliver(?:y)?(?:\s*address)?)[：:]/i;
+const originMarker = /(?:(?:商业|家庭|住宅|私人地址)(?:有|无)卸货平台|(?:commercial|residential)\s+(?:with|without)\s+(?:a\s+)?loading\s+dock\s*)?(?:发货人?(?:地址)?|提货(?:地址|地)?|取货(?:地址|地)?|sender(?:\s*address)?|ship\s*from|pickup(?:\s*address)?)[：:]/i;
+const destinationMarker = /(?:(?:商业|家庭|住宅|私人地址)(?:有|无)卸货平台|(?:commercial|residential)\s+(?:with|without)\s+(?:a\s+)?loading\s+dock\s*)?(?:收货人?(?:地址)?|派送(?:地址|地)?|送货(?:地址|地)?|receiver(?:\s*address)?|consignee(?:\s*address)?|ship\s*to|deliver(?:y)?(?:\s*address)?)[：:]/i;
 const dimensionsPattern = /(\d+(?:\.\d+)?)\s*[x×*＊]\s*(\d+(?:\.\d+)?)\s*[x×*＊]\s*(\d+(?:\.\d+)?)\s*(厘米|公分|公尺|英寸|米|(?:cm|meters?|metres?|m|inches|inch|in)\b|")?/i;
 const pickupAddressPrefix = /^\s*(?:发货人?地址|提货地址|取货地址)\s*[：:]?\s*/;
 const deliveryAddressPrefix = /^\s*(?:收货人?地址|派送地址|送货地址)\s*[：:]?\s*/;
-const deliveryServiceLine = /^(?:(?:商业|住宅|家庭)(?:地址|派送|送货)?|(?:电话)?预约(?:派送|送货)?|(?:派送|送货)(?:要求|服务)?[：:]?|(?:需(?:要)?|派送|送货)?(?:尾板|尾门)(?:车|服务)?|(?:commercial|residential)(?:\s+(?:address|delivery))?|delivery\s+(?:services?|requirements?)[:：]?|appointment(?:\s+delivery)?|lift\s*gate(?:\s+at\s+delivery)?|[\s,，、;；])+$/i;
+const deliveryServiceLine = /^(?:(?:商业|住宅|家庭|私人地址)(?:地址|派送|送货)?|(?:电话)?预约(?:派送|送货)?|(?:派送|送货)(?:要求|服务)?[：:]?|(?:需(?:要)?|派送|送货)?(?:尾板|尾门)(?:车|服务)?|(?:commercial|residential)(?:\s+(?:address|delivery))?|delivery\s+(?:services?|requirements?)[:：]?|appointment(?:\s+delivery)?|lift\s*gate(?:\s+at\s+delivery)?|[\s,，、;；])+$/i;
 const commercialDelivery = /商业|\bcommercial\b(?=\s*(?:[,，;；]|$)|\s+(?:address|delivery|location|with|without|no)\b)/i;
 export const missingDimensionUnit = "dimension unit (m, cm, or in)";
 const weightPattern = /(\d+(?:\.\d+)?)\s*(kg|公斤|kgs?|lbs?|磅)/gi;
-const addressDescriptorPattern = /商业|家庭|住宅|有卸货平台|无卸货平台|尾门|尾板|预约|有限地点|限制地点|commercial|residential|\bhome\b|with(?:\s+a)?\s+loading\s+dock|without(?:\s+a)?\s+loading\s+dock|no\s+(?:loading\s+)?dock|loading\s+dock|lift\s*gate|liftgate|appointment|limited\s*access/gi;
+const addressDescriptorPattern = /商业|家庭|住宅|私人地址|有卸货平台|无卸货平台|尾门|尾板|预约|有限地点|限制地点|commercial|residential|\bhome\b|with(?:\s+a)?\s+loading\s+dock|without(?:\s+a)?\s+loading\s+dock|no\s+(?:loading\s+)?dock|loading\s+dock|lift\s*gate|liftgate|appointment|limited\s*access/gi;
 
 function matchWithIndex(text: string, pattern: RegExp): TextMatch | null {
   const match = text.match(pattern);
@@ -69,7 +69,7 @@ function stripAddressLine(line: string, marker: RegExp) {
 
 function detectServices(originLine: string, destinationLine: string, cargoText: string) {
   const services = new Set<string>();
-  const residential = /家庭|住宅|residential|\bhome\b/i;
+  const residential = /家庭|住宅|私人地址|residential|\bhome\b/i;
   const liftgate = /无卸货平台|无装卸平台|尾门|尾板|lift\s*gate|liftgate|without(?:\s+a)?\s+loading\s+dock|no\s+(?:loading\s+)?dock/i;
   if (residential.test(originLine)) services.add("Residential pickup");
   if (residential.test(destinationLine)) services.add("Residential delivery");
