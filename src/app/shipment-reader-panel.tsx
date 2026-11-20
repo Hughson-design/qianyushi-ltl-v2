@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type FormEve
 import { READER_ACCEPT, READER_MAX_BYTES, READER_MAX_FILES, READER_MAX_TEXT, READER_MIME, readerExtension, type ReaderResult } from "@/lib/shipment-reader";
 import { parseSmartQuote, type SmartQuoteResult, type SmartFreightItem } from "@/lib/smart-quote-parser";
 
-type Attachment = { id: string; file: File; preview?: string };
+type Attachment = { id: string; file: File; url: string; preview?: string };
 type Props = { language: "zh" | "en"; onUse: (result: SmartQuoteResult, text: string) => void };
 type EditableFreight = SmartFreightItem & { dimensionUnit: string; weightUnit: string };
 const blankFreight = (): EditableFreight => ({ packaging: "Pallet", pallets: "1", pieces: "1", length: "", width: "", height: "", unitWeight: "", commodity: "", nmfc: "", declaredValue: "", stackable: true, hazmat: false, dimensionUnit: "in", weightUnit: "lb" });
@@ -40,7 +40,7 @@ export function ShipmentReaderPanel({ language, onUse }: Props) {
       .catch(() => { if (!controller.signal.aborted) setAiAvailable(false); });
     return () => {
       controller.abort(); abort.current?.abort(); sequence.current += 1;
-      for (const item of attachmentsRef.current) if (item.preview) URL.revokeObjectURL(item.preview);
+      for (const item of attachmentsRef.current) URL.revokeObjectURL(item.url);
     };
   }, []);
 
@@ -62,6 +62,18 @@ export function ShipmentReaderPanel({ language, onUse }: Props) {
   }
   function replaceAttachments(next: Attachment[]) { attachmentsRef.current = next; setAttachments(next); }
 
+  function openAttachment(item: Attachment) {
+    const extension = readerExtension(item.file.name);
+    if (["png", "jpg", "jpeg", "webp", "pdf", "txt"].includes(extension)) {
+      window.open(item.url, "_blank", "noopener,noreferrer");
+    } else {
+      // Office documents need a local application; preserve the original filename.
+      const link = document.createElement("a");
+      link.href = item.url; link.download = item.file.name;
+      document.body.appendChild(link); link.click(); link.remove();
+    }
+  }
+
   function addFiles(incoming: File[]) {
     if (busy) return;
     setError("");
@@ -73,7 +85,11 @@ export function ShipmentReaderPanel({ language, onUse }: Props) {
     if ([...existing.map((item) => item.file), ...incoming].reduce((sum, file) => sum + file.size, new TextEncoder().encode(text).length) > READER_MAX_BYTES) {
       setError(copy("资料合计不能超过 2.5 MB，请压缩图片或减少文件。", "Keep all files and text under 2.5 MB.")); return;
     }
-    const added = incoming.map((file) => ({ id: crypto.randomUUID(), file, preview: ["png", "jpg", "jpeg", "webp"].includes(readerExtension(file.name)) ? URL.createObjectURL(file) : undefined }));
+    const added = incoming.map((file) => {
+      const extension = readerExtension(file.name);
+      const url = URL.createObjectURL(file.slice(0, file.size, READER_MIME[extension]));
+      return { id: crypto.randomUUID(), file, url, preview: ["png", "jpg", "jpeg", "webp"].includes(extension) ? url : undefined };
+    });
     replaceAttachments([...existing, ...added]); invalidate();
   }
 
@@ -146,15 +162,19 @@ export function ShipmentReaderPanel({ language, onUse }: Props) {
           <input ref={fileInput} type="file" multiple accept={READER_ACCEPT} hidden disabled={busy} onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ""; }} />
         </div>
         {attachments.length > 0 && <ul className="reader-files">{attachments.map((item) => <li key={item.id}>
-          {item.preview ? <img src={item.preview} alt={item.file.name} /> : <span className="reader-file-type">{readerExtension(item.file.name).toUpperCase()}</span>}
-          <div><strong>{item.file.name}</strong><small>{(item.file.size / 1000).toFixed(0)} KB</small></div><button type="button" disabled={busy} aria-label={`${copy("移除", "Remove")} ${item.file.name}`} onClick={() => { if (item.preview) URL.revokeObjectURL(item.preview); replaceAttachments(attachments.filter((entry) => entry.id !== item.id)); invalidate(); }}>×</button>
+          <button type="button" className="reader-file-open" aria-label={`${copy("打开", "Open")} ${item.file.name}`} title={copy("双击打开原文件；Excel、Word 将下载后在本机打开", "Double-click to open; download Excel/Word to open locally")} onDoubleClick={() => openAttachment(item)} onClick={(event) => { if (event.detail === 0) openAttachment(item); }}>
+            {item.preview ? <img src={item.preview} alt="" /> : <span className="reader-file-type">{readerExtension(item.file.name).toUpperCase()}</span>}
+            <span className="reader-file-info"><strong>{item.file.name}</strong><small>{(item.file.size / 1000).toFixed(0)} KB · {copy("双击打开", "Double-click to open")}</small></span>
+          </button>
+          <button type="button" className="reader-file-action" onClick={() => openAttachment(item)}>{copy("打开", "Open")}</button>
+          <button type="button" disabled={busy} aria-label={`${copy("移除", "Remove")} ${item.file.name}`} onClick={() => { URL.revokeObjectURL(item.url); replaceAttachments(attachments.filter((entry) => entry.id !== item.id)); invalidate(); }}>×</button>
         </li>)}</ul>}
         <div className="reader-ai-choice"><label><input type="checkbox" checked={useAi} disabled={busy || aiAvailable !== true} onChange={(event) => { setUseAi(event.target.checked); invalidate(); }} /><span><strong>{copy("使用 AI 理解资料", "Use AI extraction")}</strong><small>{copy("勾选后，所提交的文字及文件将发送给 OpenAI，按使用量计费。", "When selected, submitted text and files are sent to OpenAI and billed by usage.")}</small></span></label>
           {aiAvailable === false && <p>{copy("AI 尚未启用：请管理员配置 OPENAI_API_KEY。普通文字解析可先使用。", "AI is not enabled. Ask the administrator to configure OPENAI_API_KEY. Basic text parsing is available.")}</p>}
           {hasBinary && !useAi && <p>{copy("图片、扫描 PDF、Word 和 Excel 需要启用 AI 识别。", "Images, PDFs, Word, and Excel require AI extraction.")}</p>}
         </div>
         {error && <p className="reader-error" role="alert">{error}</p>}
-        <div className="reader-form-actions"><button type="submit" className="reader-primary" disabled={busy || (!text.trim() && !attachments.length) || (hasBinary && !useAi)}>{busy ? copy("正在识别…", "Reading…") : copy("开始识别", "Read shipment")}</button>{busy ? <button type="button" className="reader-secondary" onClick={() => { abort.current?.abort(); sequence.current += 1; setBusy(false); }}>{copy("取消", "Cancel")}</button> : <button type="button" className="reader-secondary" disabled={!text && !attachments.length && !result} onClick={() => { for (const item of attachments) if (item.preview) URL.revokeObjectURL(item.preview); replaceAttachments([]); setText(""); invalidate(); }}>{copy("清空", "Clear")}</button>}</div>
+        <div className="reader-form-actions"><button type="submit" className="reader-primary" disabled={busy || (!text.trim() && !attachments.length) || (hasBinary && !useAi)}>{busy ? copy("正在识别…", "Reading…") : copy("开始识别", "Read shipment")}</button>{busy ? <button type="button" className="reader-secondary" onClick={() => { abort.current?.abort(); sequence.current += 1; setBusy(false); }}>{copy("取消", "Cancel")}</button> : <button type="button" className="reader-secondary" disabled={!text && !attachments.length && !result} onClick={() => { for (const item of attachments) URL.revokeObjectURL(item.url); replaceAttachments([]); setText(""); invalidate(); }}>{copy("清空", "Clear")}</button>}</div>
         <p className="reader-footnote">{copy("原文件不会保存到本站数据库；只有确认后带入的询价文字会按现有询价记录规则保存。", "Original files are not saved to this site's database. Confirmed quote text follows existing quote input history rules.")}</p>
       </form>
       <section className="panel reader-output" aria-busy={busy} aria-live="polite">

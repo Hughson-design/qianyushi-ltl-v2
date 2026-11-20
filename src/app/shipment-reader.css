@@ -23,11 +23,16 @@
 .reader-page .reader-secondary { border: 1px solid #cbd9d2; color: #176b4a; background: white; border-radius: 8px; padding: 9px 15px; }
 .reader-files { display: grid; gap: 7px; padding: 0; margin: 13px 0; list-style: none; }
 .reader-files li { display: flex; align-items: center; gap: 10px; border: 1px solid #e0e8e3; border-radius: 9px; padding: 8px; }
-.reader-files li > img { width: 46px; height: 46px; object-fit: cover; border-radius: 5px; }
+.reader-file-open img { width: 46px; height: 46px; object-fit: cover; border-radius: 5px; }
 .reader-file-type { width: 46px; flex-shrink: 0; text-align: center; color: #176b4a; font-size: 11px; font-weight: 800; }
 .reader-files li > div { flex: 1; min-width: 0; }
 .reader-files strong { display: block; overflow-wrap: anywhere; font-size: 12px; }
 .reader-files li button { background: #f5f8f6; border-radius: 7px; padding: 6px 10px; color: #52695d; font-size: 19px; }
+.reader-files li .reader-file-open { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 4px; background: transparent; text-align: left; color: #176b4a; }
+.reader-file-info { min-width: 0; }
+.reader-file-open:hover strong { text-decoration: underline; }
+.reader-file-open:focus-visible { outline: 2px solid #176b4a; outline-offset: 2px; }
+.reader-files li .reader-file-action { flex-shrink: 0; color: #176b4a; font-size: 12px; }
 .reader-ai-choice { padding: 13px; margin: 14px 0; background: #f4f7f5; border-radius: 9px; }
 .reader-ai-choice label, .reader-review-check { display: flex; align-items: flex-start; gap: 9px; font-size: 12px; line-height: 1.6; }
 .reader-page input[type=checkbox] { width: 16px; height: 16px; margin: 2px 0 0; accent-color: #176b4a; flex-shrink: 0; }
