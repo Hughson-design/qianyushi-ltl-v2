@@ -28,6 +28,29 @@ export function tqlConnectionStatus() {
   return { mode, missing: required.filter((name) => !process.env[name]?.trim()) };
 }
 
+export function auditTqlConfiguration() {
+  const status = tqlConnectionStatus();
+  const expectedScopes = ["LTLQuotes.Read", "LTLQuotes.Write", "LTLQuotes.Tender", "LoadTracking.Read"].map((name) => `https://tqlidentity.onmicrosoft.com/services_combined/${name}`);
+  const scopes = (process.env.TQL_SCOPE || "").trim().split(/\s+/).filter(Boolean);
+  const id = process.env.TQL_CLIENT_ID?.trim() || "";
+  const key = process.env.TQL_SUBSCRIPTION_KEY?.trim() || "";
+  const password = process.env.TQL_PASSWORD || "";
+  const required = ["TQL_CLIENT_ID", "TQL_SUBSCRIPTION_KEY", "TQL_USERNAME", "TQL_PASSWORD"];
+  return {
+    mode: status.mode, missing: status.missing,
+    checks: {
+      authEndpointMatchesEmail: (process.env.TQL_AUTH_URL?.trim() || "https://public.api.tql.com/identity/token") === "https://public.api.tql.com/identity/token",
+      apiBaseMatchesProduction: (process.env.TQL_API_BASE?.trim() || "https://public.api.tql.com/ltl").replace(/\/$/, "") === "https://public.api.tql.com/ltl",
+      scopesMatchEmail: scopes.length === expectedScopes.length && expectedScopes.every((scope) => scopes.includes(scope)),
+      clientIdIsSingleUuid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id),
+      subscriptionKeyHasNoWhitespace: Boolean(key) && !/\s/.test(key),
+      noCredentialPlaceholders: required.every((name) => !/^(?:YOUR_|REPLACE_|<|placeholder|fixture-|test-only)/i.test(process.env[name]?.trim() || "")),
+      passwordHasNoEdgeWhitespace: Boolean(password) && password === password.trim(),
+      scopeUsesSingleSpaces: (process.env.TQL_SCOPE?.trim() || "") === scopes.join(" "),
+    },
+  };
+}
+
 function configuration() {
   const status = tqlConnectionStatus();
   if (status.missing.length) throw new Error(`TQL API is not configured: ${status.missing.join(", ")}.`);

@@ -10,7 +10,7 @@ function load(path, names, globals) {
 const credentials = { TQL_SUBSCRIPTION_KEY: 'fixture-key', TQL_CLIENT_ID: 'fixture-id', TQL_USERNAME: 'fixture-user', TQL_PASSWORD: 'fixture-password', TQL_SCOPE: 'fixture-scope' };
 function carrier(overrides = {}, response = { access_token: 'fixture-token', expires_in: 3600 }, status = 200, raw = false) {
   const calls = [];
-  const api = load('src/lib/carriers/tql.ts', ['testTqlAuthentication', 'getToken', 'tqlConnectionStatus'], {
+  const api = load('src/lib/carriers/tql.ts', ['testTqlAuthentication', 'getToken', 'tqlConnectionStatus', 'auditTqlConfiguration'], {
     process: { env: { ...credentials, ...overrides } },
     fetch: async (url, init) => { calls.push({ url, init }); return raw ? new Response(response, { status, headers: { 'content-type': 'text/plain' } }) : Response.json(response, { status }); },
   });
@@ -73,10 +73,11 @@ test('provider authentication errors do not expose returned secrets or tokens', 
 });
 function endpoint({ authorized = true, missing = [], reject = false } = {}) {
   let attempts = 0;
-  const api = load('src/app/api/settings/tql/test/route.ts', ['POST'], {
+  const api = load('src/app/api/settings/tql/test/route.ts', ['POST', 'GET'], {
     NextResponse: { json: (value, options) => Response.json(value, options) },
     requireAdminSession: async () => authorized ? { session: { userId: 'fixture-admin' } } : { response: Response.json({}, { status: 403 }) },
     tqlConnectionStatus: () => ({ mode: 'public', missing }),
+    auditTqlConfiguration: () => ({ mode: 'public', missing, checks: { authEndpointMatchesEmail: true } }),
     testTqlAuthentication: async () => { attempts++; if (reject) throw new Error('internal-secret'); return { authenticated: true, mode: 'public' }; },
   });
   return { ...api, attempts: () => attempts };
@@ -94,4 +95,15 @@ test('test endpoint throttles retries and redacts unexpected failures', async ()
   assert.equal((await app.POST(request())).status, 429); assert.equal(app.attempts(), 1);
   const failure = await endpoint({ reject: true }).POST(request());
   assert.equal(failure.status, 502); assert.equal((await failure.text()).includes('internal-secret'), false);
+});
+test('configuration audit checks runtime formatting without any TQL request or secret disclosure', async () => {
+  const scopes = ['LTLQuotes.Read', 'LTLQuotes.Write', 'LTLQuotes.Tender', 'LoadTracking.Read'].map(s=>`https://tqlidentity.onmicrosoft.com/services_combined/${s}`).join(' ');
+  const api = carrier({ TQL_AUTH_MODE: 'public', TQL_CLIENT_ID: '12345678-1234-1234-1234-123456789abc', TQL_SUBSCRIPTION_KEY: 'unit-test-key', TQL_USERNAME: 'unit-test-user', TQL_PASSWORD: 'unit-test-password', TQL_SCOPE: scopes });
+  const audit = api.auditTqlConfiguration();
+  assert.equal(Object.values(audit.checks).every(Boolean), true); assert.equal(api.calls.length, 0);
+  assert.equal(JSON.stringify(audit).includes('fixture'), false);
+  const bad = carrier({ TQL_AUTH_URL: 'https://public.api.tql.com/', TQL_SCOPE: scopes.replaceAll(' ', '\n'), TQL_PASSWORD: ' trailing ' }).auditTqlConfiguration();
+  assert.equal(bad.checks.authEndpointMatchesEmail, false); assert.equal(bad.checks.scopeUsesSingleSpaces, false); assert.equal(bad.checks.passwordHasNoEdgeWhitespace, false);
+  const denied = endpoint({ authorized: false }); assert.equal((await denied.GET()).status, 403);
+  const read = endpoint(); const response = await read.GET(); assert.equal(response.status, 200); assert.equal(read.attempts(), 0);
 });

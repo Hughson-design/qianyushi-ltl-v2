@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/auth-server";
-import { testTqlAuthentication, tqlConnectionStatus } from "@/lib/carriers/tql";
+import { auditTqlConfiguration, testTqlAuthentication, tqlConnectionStatus } from "@/lib/carriers/tql";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 const attempts = new Map<string, number>();
 const json = (body: object, status = 200) => NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
+
+export async function GET() {
+  const auth = await requireAdminSession();
+  if (!auth.session || auth.response) return auth.response;
+  try { return json(auditTqlConfiguration()); }
+  catch { return json({ error: "TQL_AUTH_MODE must be public or legacy." }, 503); }
+}
 
 export async function POST(request: Request) {
   const auth = await requireAdminSession();
