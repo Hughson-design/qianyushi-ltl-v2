@@ -52,8 +52,8 @@ function zipFrom(address: string) {
   return matches?.at(-1) ?? "";
 }
 
-function rounded(value: number) {
-  return String(Math.round(value));
+function roundUp(value: number) {
+  return String(Math.ceil(value));
 }
 
 function fieldValue(text: string, names: string) {
@@ -112,8 +112,8 @@ function freightItemFromLine(line: string, conversions: string[], missing: strin
   const hazmat = /危险品|hazmat|hazardous/i.test(line) && !/非危险品|不是危险品|non[-\s]?hazmat/i.test(line);
   const stackable = !/不可堆叠|不能堆叠|non[-\s]?stackable|do\s*not\s*stack/i.test(line);
 
-  if (centimetersPerUnit) conversions.push(`${rawLength}×${rawWidth}×${rawHeight} ${centimetersPerUnit === 100 ? "m" : "cm"} → ${rounded(convertedLength)}×${rounded(convertedWidth)}×${rounded(convertedHeight)} in`);
-  if (isKilograms && weight) conversions.push(`${rawWeight} kg → ${rounded(convertedWeight)} lb`);
+  if (centimetersPerUnit) conversions.push(`${rawLength}×${rawWidth}×${rawHeight} ${centimetersPerUnit === 100 ? "m" : "cm"} → ${roundUp(convertedLength)}×${roundUp(convertedWidth)}×${roundUp(convertedHeight)} in`);
+  if (isKilograms && weight) conversions.push(`${rawWeight} kg → ${roundUp(convertedWeight)} lb`);
   if (dimensions && !dimensionUnit && !needsUnit && !conversions.includes("Dimensions without units use inches (in).")) {
     conversions.push("Dimensions without units use inches (in).");
   }
@@ -127,10 +127,10 @@ function freightItemFromLine(line: string, conversions: string[], missing: strin
     pallets,
     pieces: line.match(/(\d+)\s*(?:件|pieces?\b|pcs\b)/i)?.[1] ?? pallets,
     nmfc: line.match(/\bNMFC\s*(?:#|:|：)?\s*(\d+(?:-\d+)?)/i)?.[1] ?? "",
-    length: needsUnit ? "" : rounded(convertedLength),
-    width: needsUnit ? "" : rounded(convertedWidth),
-    height: needsUnit ? "" : rounded(convertedHeight),
-    unitWeight: rounded(unitWeight),
+    length: needsUnit ? "" : roundUp(convertedLength),
+    width: needsUnit ? "" : roundUp(convertedWidth),
+    height: needsUnit ? "" : roundUp(convertedHeight),
+    unitWeight: roundUp(unitWeight),
     hazmat,
     commodity,
     declaredValue,

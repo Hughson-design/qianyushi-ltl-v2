@@ -11,6 +11,22 @@ function load(path, names, globals = {}) {
 const parser = load('src/lib/smart-quote-parser.ts', ['parseSmartQuote']);
 const reader = load('src/lib/shipment-reader.ts', ['readerResult', 'readerExtension', 'readerInstructions', 'readerSchema', 'READER_MAX_BYTES', 'READER_MAX_FILES', 'READER_MAX_TEXT', 'READER_MIME'], parser);
 const text = '提货地址：91789\n收货地址：1251 E Walnut, Carson, CA 90746\n7 pallets, 7 pieces, 120*100*180 cm, 744 kg, commodity: Furniture';
+test('dimensions and weights round upward after unit conversion and total-weight allocation', () => {
+  const route = '提货地址：90670\n收货地址：32811\n';
+  for (const dimensions of ['120×100×180 cm', '1.2×1×1.8 m']) {
+    const result = parser.parseSmartQuote(route + `16 pallets, ${dimensions}, 309 kg`);
+    const item = result.items[0];
+    assert.deepEqual([item.length, item.width, item.height, item.unitWeight], ['48', '40', '71', '682']);
+    assert.equal(Number(item.pallets) * Number(item.unitWeight), 10912);
+    assert.ok(result.conversions.some(value => value.includes('48×40×71 in')));
+    assert.ok(result.conversions.some(value => value.includes('682 lb')));
+    assert.equal(reader.readerResult(route + `16 pallets, ${dimensions}, 309 kg`, '', [], 'rules').parsed.items[0].unitWeight, '682');
+  }
+  const exact = parser.parseSmartQuote(route + '1 pallet, 48×40×71 in, 682 lb').items[0];
+  assert.deepEqual([exact.length, exact.width, exact.height, exact.unitWeight], ['48', '40', '71', '682']);
+  const allocated = parser.parseSmartQuote(route + '3 pallets, 48.1×40.1×71.1 in, total weight: 100 lb').items[0];
+  assert.deepEqual([allocated.length, allocated.width, allocated.height, allocated.unitWeight], ['49', '41', '72', '34']);
+});
 test('private address means residential, preserving separately stated delivery services', () => {
   const base = '提货地址：91789\n收货地址：1251 E Walnut, Carson, CA 90746\n';
   const freight = '1 pallet, 48*40*48 in, 500 lb';

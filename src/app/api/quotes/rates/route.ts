@@ -108,7 +108,7 @@ function normalizeItem(item: IncomingItem, index: number): QuoteLineItem {
     length: positiveNumber(item.length, `Line ${index + 1} length`),
     width: positiveNumber(item.width, `Line ${index + 1} width`),
     height: positiveNumber(item.height, `Line ${index + 1} height`),
-    totalWeight: Math.round(pallets * unitWeight),
+    totalWeight: Math.ceil(pallets * unitWeight),
     freightClass: String(item.freightClass || "70"),
     hazmat: item.hazmat === true,
     commodity: String(item.commodity || "General merchandise").trim(),
