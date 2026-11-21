@@ -770,3 +770,13 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .quotes-table .history-sort-button:focus-visible { outline: 2px solid var(--green); outline-offset: 4px; }
 
 .orders-table .shipment-zip { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* Task-based platform help, with readable text and compact expandable sections. */
+.help-dialog .help-list { grid-template-columns: 1fr; gap: 8px; }
+.help-list details { min-width: 0; border: 1px solid var(--line); border-radius: 9px; background: #f8faf9; }
+.help-list summary { padding: 12px 14px; color: var(--ink); font-size: 13px; font-weight: 700; cursor: pointer; }
+.help-list summary:focus-visible { outline: 2px solid var(--green); outline-offset: -3px; border-radius: 9px; }
+.help-list details[open] summary { color: var(--green); border-bottom: 1px solid var(--line); }
+.help-list ul { margin: 12px 14px 14px; padding-left: 20px; color: #45514c; font-size: 12px; line-height: 1.75; }
+.help-list li + li { margin-top: 8px; }
+.help-list pre { margin: 0 14px 14px; padding: 12px; border: 1px solid var(--line); border-radius: 7px; background: white; color: #34473c; font-size: 11px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }

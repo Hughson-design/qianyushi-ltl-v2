@@ -11,6 +11,7 @@ import { MyAccount } from "./my-account";
 import { QuoteInputHistory } from "./quote-input-history";
 import { CustomerWorkspaces } from "./customer-workspaces";
 import { HistorySort, HistorySortKey, nextHistorySort, sortHistory } from "@/lib/history-sort";
+import { platformHelp } from "@/lib/platform-help";
 import { formatPhoneInput } from "@/lib/phone";
 import { AdminUserEditor } from "./admin-user-editor";
 import { printBol, printShippingLabel } from "./print-bol";
@@ -362,21 +363,7 @@ export default function Home() {
   const pickerAddresses = addressBookEntries.filter((entry) => !entry.category || entry.category === "both" || entry.category === pickerCategory);
   const tx = (english: string) => language === "zh" ? chineseTranslations[english] || english : english;
   const statusLabel = (status: string) => language === "zh" ? ({ draft: "草稿", booking: "待核对（押金已预留）", booked: "已生成 BOL", void: "已取消" }[status] || status) : status;
-  const helpItems = language === "zh" ? [
-    { title: "1. 智能报价", body: "第一行粘贴发货地址，第二行粘贴收货地址，第三行起每行填写一项货物。点击“帮我填写”后，请检查系统识别的地址、附加服务和货物资料。" },
-    { title: "2. 路线和货物", body: "尺寸统一使用 inch，重量统一使用 lb。总重量和 Class 会自动计算，无法手工修改。" },
-    { title: "3. 获取报价", body: "确认路线、货物和附加服务后点击“获取报价”，选择合适的承运商价格，再继续填写下单资料。" },
-    { title: "4. Booking 与 BOL", body: "补全发货人、收货人、联系人和提货时间。保存资料只会建立草稿；点击“生成 BOL”会同时向承运商预约 Pickup，并从客户押金中扣除相应费用。" },
-    { title: "5. 取消运单", body: "在报价或订单页面点击“取消运单”，系统会尝试取消承运商运单和 Pickup；成功后，原先扣除的押金会退回。" },
-    { title: "6. 地址簿与押金", body: "常用发货和收货地址可保存到地址簿。押金页面显示充值、BOL 扣款和取消退款记录。" },
-  ] : [
-    { title: "1. Smart quote", body: "Paste the sender on line 1, receiver on line 2, and one freight item per line after that. Select Autofill, then review the recognized addresses, services, and freight." },
-    { title: "2. Route and freight", body: "Dimensions use inches and weights use pounds. Total weight and Class are calculated automatically and cannot be edited." },
-    { title: "3. Get rates", body: "Confirm the route, freight, and additional services, select Get rates, then choose a carrier rate and continue to booking." },
-    { title: "4. Booking and BOL", body: "Complete the sender, receiver, contacts, and pickup times. Saving creates a draft only. Generate BOL also schedules the carrier Pickup and deducts the charge from the customer deposit." },
-    { title: "5. Void shipment", body: "Void shipment attempts to cancel both the carrier shipment and Pickup. When successful, the original deposit charge is refunded." },
-    { title: "6. Address book and deposit", body: "Save frequently used sender and receiver locations in the address book. Deposit shows payments, BOL charges, and void refunds." },
-  ];
+  const helpItems = platformHelp[language];
 
   function toggleLanguage() {
     setLanguage((current) => {
@@ -1700,10 +1687,10 @@ export default function Home() {
         <div className="address-book-backdrop" role="presentation" onMouseDown={() => setHelpOpen(false)}>
           <section className="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" onMouseDown={(event) => event.stopPropagation()}>
             <header>
-              <div><p className="eyebrow">{language === "zh" ? "使用说明" : "QUICK GUIDE"}</p><h2 id="help-title">{language === "zh" ? "平台帮助" : "Platform help"}</h2><span>{language === "zh" ? "LTL 报价与生成 BOL 的基本流程" : "The basic LTL quote and BOL workflow"}</span></div>
+              <div><p className="eyebrow">{language === "zh" ? "使用说明" : "QUICK GUIDE"}</p><h2 id="help-title">{language === "zh" ? "平台帮助" : "Platform help"}</h2><span>{language === "zh" ? "按操作流程查找说明，点击标题展开" : "Find your task below and expand a section"}</span></div>
               <button type="button" onClick={() => setHelpOpen(false)} aria-label={language === "zh" ? "关闭帮助" : "Close help"}>×</button>
             </header>
-            <div className="help-list">{helpItems.map((item) => <article key={item.title}><h3>{item.title}</h3><p>{item.body}</p></article>)}</div>
+            <div className="help-list" key={language}>{helpItems.map((item, index) => <details key={item.title} open={index === 0}><summary>{item.title}</summary><ul>{item.steps.map((step) => <li key={step}>{step}</li>)}</ul>{item.example && <pre>{item.example}</pre>}</details>)}</div>
             <footer><button type="button" onClick={() => setHelpOpen(false)}>{language === "zh" ? "知道了" : "Got it"}</button></footer>
           </section>
         </div>
