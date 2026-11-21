@@ -1,4 +1,4 @@
-export type HistorySortKey = "quote_number" | "bol_number" | "reference" | "route" | "customer" | "carrier" | "ready_date" | "status" | "price";
+export type HistorySortKey = "quote_number" | "bol_number" | "reference" | "route" | "origin_zip" | "destination_zip" | "customer" | "carrier" | "ready_date" | "status" | "price";
 export type HistorySort = { key: HistorySortKey; direction: "asc" | "desc" };
 
 type HistoryRow = {

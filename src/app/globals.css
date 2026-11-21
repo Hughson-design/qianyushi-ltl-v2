@@ -768,3 +768,5 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .quotes-table .history-sort-button span { color: #89958f; font-size: 12px; }
 .quotes-table .history-sort-button:hover, .quotes-table .history-sort-button.active, .quotes-table .history-sort-button.active span { color: var(--green); }
 .quotes-table .history-sort-button:focus-visible { outline: 2px solid var(--green); outline-offset: 4px; }
+
+.orders-table .shipment-zip { white-space: nowrap; font-variant-numeric: tabular-nums; }
