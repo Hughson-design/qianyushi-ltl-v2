@@ -32,7 +32,7 @@ export function CustomerWorkspaces({ customers, currentId, language, loading, on
 
   return <section className="panel customer-directory workspace-directory">
     <header className="workspace-directory-heading">
-      <div className="workspace-directory-title"><h2>{copy("Customer workspaces", "客户工作区")}</h2><span className="directory-count">{customers.length}</span></div>
+      <div className="workspace-directory-title"><h2>{copy("Customers", "客户列表")}</h2><span className="directory-count">{customers.length}</span></div>
       <input type="search" aria-label={copy("Search customers", "搜索客户")} placeholder={copy("Search name or code", "搜索名称或代码")} value={search} onChange={(event) => setSearch(event.target.value)} />
     </header>
     {draft && <form ref={editor} className="workspace-editor customer-form" onSubmit={save}>
@@ -63,8 +63,8 @@ export function CustomerWorkspaces({ customers, currentId, language, loading, on
           <span>{customer.can_self_book ? copy("BOL enabled", "可生成 BOL") : copy("BOL disabled", "BOL 已禁用")}</span>
           <div className="workspace-card-actions">
             {customer.id === currentId
-              ? <span className="workspace-current">{copy("Current workspace", "当前工作区")}</span>
-              : <button type="button" disabled={loading || !customer.active} onClick={() => void onSelect(customer)}>{copy("Use workspace", "进入工作区")}</button>}
+              ? <span className="workspace-current">{copy("Current customer", "当前客户")}</span>
+              : <button type="button" disabled={loading || !customer.active} onClick={() => void onSelect(customer)}>{copy("Select customer", "选择客户")}</button>}
             <details className="company-user-more">
               <summary aria-label={`${copy("Manage", "管理")} ${customer.name}`}>⋮</summary>
               <div>

@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 
 type Record = { id: string | number; created_at: string; customer_name: string; user_name: string; user_email: string; source: string; input_text: string };
-type Props = { language: "en" | "zh"; companyName: string; onUsers: () => void; onProfile: () => void; onQuotes: () => void };
+type Props = { language: "en" | "zh"; companyName: string; accountTitle: string; onUsers: () => void; onProfile: () => void; onQuotes: () => void };
 
-export function QuoteInputHistory({ language, companyName, onUsers, onProfile, onQuotes }: Props) {
+export function QuoteInputHistory({ language, companyName, accountTitle, onUsers, onProfile, onQuotes }: Props) {
   const copy = (en: string, zh: string) => language === "zh" ? zh : en;
   const [records, setRecords] = useState<Record[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -35,12 +35,12 @@ export function QuoteInputHistory({ language, companyName, onUsers, onProfile, o
 
   return <div className="content workspace-page company-account">
     <header className="page-heading">
-      <div><h1>{copy("Company Account", "公司账户")}</h1><p>{companyName}</p></div>
+      <div><h1>{copy("Quote Input History", "询价原文记录")}</h1><p>{accountTitle} · {companyName}</p></div>
       <nav className="company-account-nav" aria-label={copy("Company account", "公司账户")}>
-        <button type="button" onClick={onProfile}>{copy("Profile", "个人资料")}</button>
-        <button type="button" onClick={onUsers}>{copy("Users", "用户")}</button>
-        <span aria-current="page">Quote input</span>
-        <button type="button" onClick={onQuotes}>{copy("Quotes", "报价")}</button>
+        <button type="button" onClick={onProfile}>{copy("My Account", "我的账户")}</button>
+        <button type="button" onClick={onUsers}>{accountTitle}</button>
+        <span aria-current="page">{copy("Quote Input History", "询价原文记录")}</span>
+        <button type="button" onClick={onQuotes}>{copy("Saved Quotes", "已保存报价")}</button>
       </nav>
     </header>
     <div className="company-user-toolbar">

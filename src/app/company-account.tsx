@@ -71,10 +71,10 @@ export function CompanyAccount({ language, customerName, currentUserId, users, r
       <header className="page-heading">
         <div><h1>{copy("Company Account", "公司账户")}</h1><p>{customerName}</p></div>
         <nav className="company-account-nav" aria-label={copy("Company account", "公司账户")}>
-          <button type="button" onClick={onProfile}>{copy("Profile", "个人资料")}</button>
+          <button type="button" onClick={onProfile}>{copy("My Account", "我的账户")}</button>
           <span aria-current="page">{copy("Users", "用户")}</span>
-          <button type="button" onClick={onQuoteInputs}>Quote input</button>
-          <button type="button" onClick={onQuotes}>{copy("Quotes", "报价")}</button>
+          <button type="button" onClick={onQuoteInputs}>{copy("Quote Input History", "询价原文记录")}</button>
+          <button type="button" onClick={onQuotes}>{copy("Saved Quotes", "已保存报价")}</button>
         </nav>
       </header>
 

@@ -217,3 +217,8 @@ Settings 已移除 Customer pricing；接口不再返回或保存平台默认加
 ## 导航名称调整（2026-11-20）
 
 Company Account 位于侧边栏 Settings（设置）分组下；原 Settings 入口、页面标题及面包屑改名为 Profile（资料设置），保存按钮改为 Save profile。原有管理员权限、资料和报价渠道设置功能保持不变。
+
+
+## 页面命名统一（2026-11-20）
+
+侧边栏业务组统一为 Shipping（运输业务）：New Quote（新建报价）、Saved Quotes（已保存报价）、Shipments（运单）、Smart Import（智能识别）和 Address Book（地址簿）。Settings（设置）保留；总管理员的公司入口为 Customers & Users（客户与用户），押金入口为 Deposits（押金管理）；客户管理员保留 Company Account（公司账户），客户用户查看 Account Balance（押金余额）。My Account（我的账户）保留，原 Profile 改为 Platform Settings（平台设置）。客户工作区标题改为 Customers（客户列表），Quote input 改为 Quote Input History（询价原文记录）。菜单、页面标题和中英文面包屑统一；路由、数据、权限和业务行为不变。

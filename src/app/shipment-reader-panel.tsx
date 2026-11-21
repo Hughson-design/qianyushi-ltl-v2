@@ -156,7 +156,7 @@ export function ShipmentReaderPanel({ language, onUse }: Props) {
   const canUse = Boolean(result && reviewText.trim() && validFreight && !parsed.missing.length && reviewed && !busy && !freightDirty);
   const quotaBlocked = quotaUnavailable || providerQuotaBlocked || Boolean(quota && (quota.blocked || quota.remaining < 6512));
   return <div className="reader-page" onPaste={paste}>
-    <section className="page-heading reader-heading"><div><p className="eyebrow">SHIPMENT READER</p><h1>{copy("资料识别", "Shipment reader")}</h1><p>{copy("粘贴文字、截图或上传文件，先核对，再带入询价。", "Paste text or screenshots, or upload documents. Review before quoting.")}</p></div><span className="reader-draft-pill">{copy("仅生成草稿", "Draft only")}</span></section>
+    <section className="page-heading reader-heading"><div><p className="eyebrow">SMART IMPORT</p><h1>{copy("智能识别", "Smart Import")}</h1><p>{copy("粘贴文字、截图或上传文件，先核对，再带入询价。", "Paste text or screenshots, or upload documents. Review before quoting.")}</p></div><span className="reader-draft-pill">{copy("仅生成草稿", "Draft only")}</span></section>
     <div className="reader-layout">
       <form className="panel reader-input" onSubmit={recognize}>
         <header className="reader-section-heading"><span className="reader-step">1</span><div><h2>{copy("导入原始资料", "Add shipment details")}</h2><p>{copy("每次一票货，可同时添加多份资料。", "One shipment at a time; combine supporting files.")}</p></div></header>
