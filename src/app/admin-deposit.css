@@ -38,13 +38,18 @@
 .deposit-history-table td:first-child { white-space: nowrap; color: #63776a; font-size: 11px; }
 .deposit-history-table .deposit-credit { color: #176b4a; font-weight: 700; }
 .deposit-history-table .deposit-debit { color: #a84b3e; font-weight: 700; }
-.deposit-workspace-tools { margin-top: 16px; border: 1px solid #dce5df; border-radius: 9px; background: #fff; padding: 13px 16px; }
-.deposit-workspace-tools > summary { cursor: pointer; color: #375c46; font-size: 12px; font-weight: 700; }
-.deposit-workspace-tools:not(.admin-workspace-tools) { padding: 0; border: 0; background: transparent; }
-.deposit-workspace-tools:not(.admin-workspace-tools) > summary { display: none; }
-.deposit-workspace-tools.admin-workspace-tools .deposit-page-grid { margin-top: 14px; grid-template-columns: minmax(220px, .7fr) minmax(0, 1.3fr); }
-.deposit-workspace-tools .deposit-page-grid > .panel { min-width: 0; }
-@media(max-width:800px) { .deposit-workspace-tools.admin-workspace-tools .deposit-page-grid { grid-template-columns: minmax(0, 1fr); } }
+.deposit-adjust-toolbar { margin: 12px 0; }
+.deposit-adjust-toolbar button { background: #176b4a; color: #fff; border-color: #176b4a; }
+.deposit-inline-adjustment { padding: 13px; margin-bottom: 16px; background: #f5f9f6; border: 1px solid #cddfd2; border-radius: 8px; }
+.deposit-inline-adjustment > p { margin: 0 0 10px; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.deposit-inline-adjustment > div { display: grid; grid-template-columns: minmax(160px,.55fr) minmax(0,1fr); gap: 12px; }
+.deposit-inline-adjustment label { display: grid; align-content: start; gap: 5px; font-size: 12px; font-weight: 650; }
+.deposit-inline-adjustment input { width: 100%; min-width: 0; height: 36px; padding: 7px 9px; border: 1px solid #c3d4c9; border-radius: 6px; background: #fff; color: #1c3929; font: inherit; }
+.deposit-inline-adjustment small { font-weight: 400; font-size: 11px; color: #6b7b70; }
+.deposit-inline-adjustment > button { margin-top: 10px; background: #176b4a; color: white; }
+.deposit-inline-adjustment .deposit-adjust-preview { margin: 8px 0 0; font-weight: 700; color: #176b4a; }
+.deposit-adjust-success { padding: 10px; background: #eaf5ee; color: #176b4a; font-size: 12px; border-radius: 6px; }
+@media(max-width:600px) { .deposit-inline-adjustment > div { grid-template-columns: minmax(0,1fr); } .deposit-inline-adjustment input { font-size: 16px; } }
 @media(max-width:600px) {
   .admin-deposit-overview { padding: 12px; }
   .deposit-overview-table { min-width: 580px; }

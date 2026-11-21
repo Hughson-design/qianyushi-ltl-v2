@@ -33,3 +33,23 @@ test('missing customer and database failures never invent zero balances or expos
  const missing=load(detail);assert.equal((await missing.get()).status,404);assert.equal(missing.calls.length,1);
  for(const path of [overview,detail]){const h=load(path,{handler:async()=>Response.json({message:'secret_table.column failed'},{status:500})});const r=await h.get();assert.equal(r.status,503);assert.ok(!(await r.text()).includes('secret_table'));}
 });
+
+function adjustmentHarness({denied=false,selectedId='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',exists=true,rpcOk=true}={}){
+ const calls=[],mutations=[];
+ const source=stripTypeScriptTypes(fs.readFileSync('src/app/api/deposit/route.ts','utf8').replace(/^import .*;\r?\n/gm,'')).replace(/\bexport /g,'');
+ const api=vm.runInNewContext(source+';({POST})',{Request,Response,URL,Number,NextResponse:{json:(b,o)=>Response.json(b,o)},requireAdminSession:async()=>denied?{response:Response.json({error:'Denied'},{status:403})}:{session:{customerId:selectedId,userId:'server-admin'}},supabaseRequest:async path=>{calls.push(path);return Response.json(exists?[{id,name:'Reviewed customer'}]:[]);},supabaseRpc:async(name,body)=>{mutations.push({name,body});return Response.json(rpcOk?1234.56:{message:'Adjustment would make the deposit balance negative'},{status:rpcOk?200:400});},responseError:async r=>(await r.json()).message});
+ return {calls,mutations,post:(body={customerId:id,amount:'100.25',reason:'Wire transfer reference'},origin='https://site')=>api.POST(new Request('https://site/api/deposit',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(body)}))};
+}
+test('adjustment targets reviewed customer rather than selected workspace and records server actor',async()=>{
+ const h=adjustmentHarness();const response=await h.post(),data=await response.json();assert.equal(response.status,200);assert.equal(data.customerId,id);assert.equal(h.mutations[0].body.p_customer_id,id);assert.equal(h.mutations[0].body.p_actor_user_id,'server-admin');assert.equal(h.mutations[0].body.p_amount,100.25);assert.match(h.calls[0],new RegExp('id=eq.'+id));assert.equal(response.headers.get('cache-control'),'no-store');
+});
+test('non-admin and foreign-origin adjustment attempts cannot access or mutate deposits',async()=>{
+ for(const h of [adjustmentHarness({denied:true}),adjustmentHarness()]){const r=await h.post(undefined,'https://evil.test');assert.equal(r.status,403);assert.equal(h.calls.length,0);assert.equal(h.mutations.length,0);}
+});
+test('invalid explicit customer never falls back to current workspace; amount and reason validation precede mutation',async()=>{
+ const h=adjustmentHarness();for(const body of [{customerId:'',amount:100,reason:'Valid reason'},{customerId:'bad',amount:100,reason:'Valid reason'},{customerId:id,amount:'1.001',reason:'Valid reason'},{customerId:id,amount:0,reason:'Valid reason'},{customerId:id,amount:'1e3',reason:'Valid reason'},{customerId:id,amount:100,reason:' '},{customerId:id,amount:100,reason:'x'.repeat(1001)}])assert.equal((await h.post(body)).status,400);assert.equal(h.calls.length,0);assert.equal(h.mutations.length,0);
+});
+test('missing customer and rejected negative adjustment do not report a successful balance change',async()=>{
+ const missing=adjustmentHarness({exists:false});assert.equal((await missing.post()).status,404);assert.equal(missing.mutations.length,0);
+ const negative=adjustmentHarness({rpcOk:false});assert.equal((await negative.post({customerId:id,amount:'-100',reason:'Correction reference'})).status,409);assert.equal(negative.mutations[0].body.p_amount,-100);
+});

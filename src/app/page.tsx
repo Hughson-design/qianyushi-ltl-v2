@@ -276,8 +276,6 @@ export default function Home() {
   const [depositOverviewVersion, setDepositOverviewVersion] = useState(0);
   const [depositLoading, setDepositLoading] = useState(false);
   const [depositError, setDepositError] = useState("");
-  const [depositAdjustment, setDepositAdjustment] = useState({ amount: "", reason: "" });
-  const [depositAdjusting, setDepositAdjusting] = useState(false);
   const [settings, setSettings] = useState<PlatformSettings>({
     company_name: "Shenzhen Qianyushi Supply Chain Service Co.,Ltd.",
     contact_name: "Cathy Huang",
@@ -799,23 +797,6 @@ export default function Home() {
       setSettingsError(error instanceof Error ? error.message : "Unable to save settings.");
     } finally {
       setSettingsLoading(false);
-    }
-  }
-
-  async function adjustDeposit(event: FormEvent) {
-    event.preventDefault();
-    setDepositAdjusting(true);
-    setDepositError("");
-    try {
-      const response = await fetch("/api/deposit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(depositAdjustment) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Unable to adjust the deposit balance.");
-      setDepositAdjustment({ amount: "", reason: "" });
-      await showDeposit();
-    } catch (error) {
-      setDepositError(error instanceof Error ? error.message : "Unable to adjust the deposit balance.");
-    } finally {
-      setDepositAdjusting(false);
     }
   }
 
@@ -1609,13 +1590,12 @@ export default function Home() {
 
         <div className="content workspace-page" hidden={view !== "deposit"}>
           <section className="page-heading"><div><p className="eyebrow">{tx("ACCOUNT BALANCE")}</p><h1>{tx("Deposit")}</h1><p>{tx("BOL charges and void refunds are recorded automatically.")}</p></div><div className="deposit-balance-large"><span>{platformAdmin ? `${language === "zh" ? "当前工作区" : "Current workspace"}: ${authUser?.customerName || "—"}` : tx("Available balance")}</span><strong>${deposit.toLocaleString(language === "zh" ? "zh-CN" : "en-US", { minimumFractionDigits: 2 })}</strong></div></section>
-          {platformAdmin && view === "deposit" && <AdminDepositOverview language={language} refreshKey={depositOverviewVersion} />}
+          {platformAdmin && view === "deposit" && <AdminDepositOverview language={language} refreshKey={depositOverviewVersion} onAdjusted={(customerId, balance) => { if (customerId === authUser?.customerId) setDeposit(balance); }} />}
           {depositError && <p className="quotes-error" role="alert">{depositError}</p>}
-          <details className={`deposit-workspace-tools ${platformAdmin ? "admin-workspace-tools" : ""}`} open={!platformAdmin}><summary>{language === "zh" ? "当前工作区充值调整与明细" : "Current workspace adjustments and activity"} · {authUser?.customerName || "—"}</summary>
+          {!platformAdmin && <>
           <div className={`deposit-page-grid ${!platformAdmin ? "ledger-only" : ""}`}>
-            {platformAdmin && <section className="panel deposit-adjustment"><h2>{tx("Manual adjustment")}</h2><p>{tx("Use a positive amount for a customer payment and a negative amount for a correction.")}</p><form onSubmit={adjustDeposit}><label>{tx("Amount (USD)")}<input required type="number" step="0.01" value={depositAdjustment.amount} onChange={(event) => setDepositAdjustment((current) => ({ ...current, amount: event.target.value }))} placeholder="1000.00" /></label><label>{tx("Payment reference / reason")}<input required value={depositAdjustment.reason} onChange={(event) => setDepositAdjustment((current) => ({ ...current, reason: event.target.value }))} placeholder={language === "zh" ? "电汇、支票号码或调整说明" : "Wire payment, check number, or correction note"} /></label><button type="submit" disabled={depositAdjusting}>{depositAdjusting ? tx("Please wait…") : tx("Apply adjustment")}</button></form></section>}
             <section className="panel deposit-ledger"><h2>{tx("Activity")}</h2>{depositLoading ? <p className="quotes-empty">{tx("Loading activity…")}</p> : depositTransactions.length === 0 ? <p className="quotes-empty">{tx("No deposit activity yet.")}</p> : <div className="deposit-rows">{depositTransactions.map((transaction) => { const amount = Number(transaction.amount); const labels: Record<DepositTransaction["transaction_type"], string> = language === "zh" ? { DEPOSIT: "押金充值", ADJUSTMENT: "手工调整", BOL_RESERVE: "生成 BOL 扣款", BOOKING_RELEASE: "订单扣款释放", VOID_REFUND: "取消运单退款" } : { DEPOSIT: "Deposit payment", ADJUSTMENT: "Manual adjustment", BOL_RESERVE: "BOL generated", BOOKING_RELEASE: "Booking charge released", VOID_REFUND: "Void refund" }; const detail = transaction.reason || (transaction.saved_quotes ? `${transaction.saved_quotes.quote_number} · ${transaction.saved_quotes.reference || (language === "zh" ? "无 Reference" : "No reference")}` : language === "zh" ? "账户余额" : "Account balance"); return <div className="deposit-row" key={transaction.id}><span className={`deposit-change ${amount >= 0 ? "positive" : "negative"}`}>{amount >= 0 ? "+" : "−"}${Math.abs(amount).toFixed(2)}</span><div><strong>{labels[transaction.transaction_type]}</strong><small>{detail}</small></div><time>{new Date(transaction.created_at).toLocaleString(language === "zh" ? "zh-CN" : "en-US")}</time><span className="balance-after">${Number(transaction.balance_after).toFixed(2)}</span></div>; })}</div>}</section>
-          </div></details>
+          </div></>}
         </div>
 
         {view === "customers" && customerAdmin && authUser && <CompanyAccount
