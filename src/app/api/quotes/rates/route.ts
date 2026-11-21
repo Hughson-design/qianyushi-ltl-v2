@@ -121,27 +121,26 @@ function cheapestFive(rates: NormalizedRate[]) {
 }
 
 async function pricingSettings(session: AppSession) {
-  const fallback = { markupPercent: 0, minimumMarkup: 0, wwexEnabled: true, priority1Enabled: true, tqlEnabled: false, mothershipEnabled: true };
+  if (!session.customerId) throw new Error("Select an active customer before requesting rates.");
   try {
-    const response = await supabaseRequest("platform_settings?select=*&id=eq.true&limit=1");
-    if (!response.ok) return fallback;
+    const response = await supabaseRequest("platform_settings?select=wwex_enabled,priority1_enabled,tql_enabled,mothership_enabled&id=eq.true&limit=1");
+    if (!response.ok) throw new Error("Settings unavailable");
     const settings = (await response.json())[0];
-    if (!settings) return fallback;
-    let customerPricing = { markup_percent: settings.markup_percent, minimum_markup: settings.minimum_markup };
-    if (session.customerId) {
-      const customerResponse = await supabaseRequest(`customers?select=markup_percent,minimum_markup&id=eq.${encodeURIComponent(session.customerId)}&limit=1`);
-      if (customerResponse.ok) customerPricing = (await customerResponse.json())[0] || customerPricing;
-    }
+    if (!settings) throw new Error("Settings missing");
+    const customerResponse = await supabaseRequest(`customers?select=markup_percent,minimum_markup,active&id=eq.${encodeURIComponent(session.customerId)}&limit=1`);
+    if (!customerResponse.ok) throw new Error("Customer pricing unavailable");
+    const customer = (await customerResponse.json())[0];
+    if (!customer || customer.active !== true || ![customer.markup_percent, customer.minimum_markup].every(value => (typeof value === "number" || (typeof value === "string" && value.trim() !== "")) && Number.isFinite(Number(value)) && Number(value) >= 0)) throw new Error("Invalid customer pricing");
     return {
-      markupPercent: Math.max(0, Number(customerPricing.markup_percent) || 0),
-      minimumMarkup: Math.max(0, Number(customerPricing.minimum_markup) || 0),
+      markupPercent: Number(customer.markup_percent),
+      minimumMarkup: Number(customer.minimum_markup),
       wwexEnabled: settings.wwex_enabled !== false,
       priority1Enabled: settings.priority1_enabled !== false,
       tqlEnabled: settings.tql_enabled === true,
       mothershipEnabled: settings.mothership_enabled !== false,
     };
   } catch {
-    return fallback;
+    throw new Error("Customer pricing or rate provider settings are unavailable. Quoting has been paused. Contact an administrator.");
   }
 }
 
@@ -179,7 +178,9 @@ async function quoteResponse(request: Request, emit?: (event: object) => void) {
       services: Array.isArray(body.services) ? body.services.map(String) : [],
     };
 
-    const pricing = await pricingSettings(auth.session);
+    let pricing;
+    try { pricing = await pricingSettings(auth.session); }
+    catch (error) { return NextResponse.json({ code: "PRICING_UNAVAILABLE", error: error instanceof Error ? error.message : "Customer pricing unavailable. Quoting paused." }, { status: 503 }); }
     const providers = [
       { id: "wwex", enabled: pricing.wwexEnabled, getRates: getWwexRates },
       { id: "priority1", enabled: pricing.priority1Enabled, getRates: getPriority1Rates },

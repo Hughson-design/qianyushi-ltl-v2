@@ -12,13 +12,15 @@ const defaults = {
   phone: "",
   default_ready_time: "09:00",
   default_close_time: "16:00",
-  markup_percent: 0,
-  minimum_markup: 0,
   wwex_enabled: true,
   priority1_enabled: true,
   tql_enabled: false,
   mothership_enabled: true,
 };
+
+function visibleSettings(record: Record<string, unknown> = {}) {
+  return Object.fromEntries(Object.entries(defaults).map(([key, fallback]) => [key, record[key] ?? fallback]));
+}
 
 async function settingsStorageError(response: Response, fallback: string) {
   const detail = await responseError(response, fallback);
@@ -36,7 +38,7 @@ export async function GET() {
     const response = await supabaseRequest("platform_settings?select=*&id=eq.true&limit=1");
     if (!response.ok) return settingsStorageError(response, "Unable to load settings.");
     const rows = await response.json();
-    const settings = { ...defaults, ...(rows[0] || {}) };
+    const settings = visibleSettings(rows[0]);
     if (auth.session.role !== "admin") {
       return NextResponse.json({ settings: Object.fromEntries(["company_name", "contact_name", "email", "phone", "default_ready_time", "default_close_time"].map(key => [key, settings[key]])) }, { headers: { "Cache-Control": "no-store" } });
     }
@@ -59,8 +61,6 @@ export async function POST(request: Request) {
       phone: String(body.phone || "").trim(),
       default_ready_time: String(body.default_ready_time || "09:00"),
       default_close_time: String(body.default_close_time || "16:00"),
-      markup_percent: Math.max(0, Number(body.markup_percent) || 0),
-      minimum_markup: Math.max(0, Number(body.minimum_markup) || 0),
       wwex_enabled: body.wwex_enabled !== false,
       priority1_enabled: body.priority1_enabled !== false,
       tql_enabled: body.tql_enabled === true,
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     }
     if (!response.ok) return settingsStorageError(response, "Unable to save settings.");
     const rows = await response.json();
-    return NextResponse.json({ settings: rows[0] });
+    return NextResponse.json({ settings: visibleSettings(rows[0]) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to save settings." }, { status: 500 });
   }
