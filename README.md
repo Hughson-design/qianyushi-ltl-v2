@@ -222,3 +222,8 @@ Company Account 位于侧边栏 Settings（设置）分组下；原 Settings 入
 ## 页面命名统一（2026-11-20）
 
 侧边栏业务组统一为 Shipping（运输业务）：New Quote（新建报价）、Saved Quotes（已保存报价）、Shipments（运单）、Smart Import（智能识别）和 Address Book（地址簿）。Settings（设置）保留；总管理员的公司入口为 Customers & Users（客户与用户），押金入口为 Deposits（押金管理）；客户管理员保留 Company Account（公司账户），客户用户查看 Account Balance（押金余额）。My Account（我的账户）保留，原 Profile 改为 Platform Settings（平台设置）。客户工作区标题改为 Customers（客户列表），Quote input 改为 Quote Input History（询价原文记录）。菜单、页面标题和中英文面包屑统一；路由、数据、权限和业务行为不变。
+
+
+### 报价与运单列表排序（2026-11-20）
+
+已保存报价、运单列表支持点击数据列表头排序，再次点击切换升序／降序；箭头表示当前方向。支持报价号／BOL、Reference / PO、路线、客户、承运商、发货日期、状态和价格。价格按数值、日期按日期先后、编号按自然顺序排列，空值始终在末尾。两个页面分别保留本次访问的排序选择，搜索后继续应用排序；默认仍为原有的新记录优先。排序适用于当前加载的记录（现有接口最多返回最近100条），不改变数据或权限，无需数据库变更。

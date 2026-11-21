@@ -762,3 +762,9 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .address-category-options legend { margin-bottom: 6px; font-weight: 700; }
 .address-category-options label { display: inline-flex; align-items: center; gap: 7px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
 .address-category-options input[type="checkbox"] { width: auto; height: auto; margin: 0; accent-color: var(--green); }
+
+/* Compact, keyboard-accessible sorting for quote and shipment history. */
+.quotes-table .history-sort-button { display: inline-flex; align-items: center; gap: 7px; width: auto; min-height: 28px; padding: 0; border: 0; border-radius: 3px; color: inherit; background: transparent; font: inherit; letter-spacing: inherit; text-transform: inherit; white-space: nowrap; cursor: pointer; }
+.quotes-table .history-sort-button span { color: #89958f; font-size: 12px; }
+.quotes-table .history-sort-button:hover, .quotes-table .history-sort-button.active, .quotes-table .history-sort-button.active span { color: var(--green); }
+.quotes-table .history-sort-button:focus-visible { outline: 2px solid var(--green); outline-offset: 4px; }

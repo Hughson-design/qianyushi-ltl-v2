@@ -10,6 +10,7 @@ import { ShipmentReaderPanel } from "./shipment-reader-panel";
 import { MyAccount } from "./my-account";
 import { QuoteInputHistory } from "./quote-input-history";
 import { CustomerWorkspaces } from "./customer-workspaces";
+import { HistorySort, HistorySortKey, nextHistorySort, sortHistory } from "@/lib/history-sort";
 import { formatPhoneInput } from "@/lib/phone";
 import { AdminUserEditor } from "./admin-user-editor";
 import { printBol, printShippingLabel } from "./print-bol";
@@ -273,6 +274,8 @@ export default function Home() {
   const [savedQuotesError, setSavedQuotesError] = useState("");
   const [savedQuotesNotice, setSavedQuotesNotice] = useState("");
   const [historySearch, setHistorySearch] = useState("");
+  const [quoteSort, setQuoteSort] = useState<HistorySort | null>(null);
+  const [shipmentSort, setShipmentSort] = useState<HistorySort | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<SavedQuote | null>(null);
   const [quoteActionId, setQuoteActionId] = useState<string | null>(null);
   const [bookingCities, setBookingCities] = useState<{ sender: string[]; receiver: string[] }>({ sender: [], receiver: [] });
@@ -481,7 +484,16 @@ export default function Home() {
     if (!query) return savedQuotes;
     return savedQuotes.filter((quote) => [quote.quote_number, quote.bol_number, quote.reference, quote.origin_zip, quote.destination_zip, quote.receiver?.company, quote.carrier].some((value) => String(value || "").toLowerCase().includes(query)));
   }, [historySearch, savedQuotes]);
-  const filteredOrders = useMemo(() => filteredQuotes.filter((quote) => quote.status === "booked" || quote.status === "void"), [filteredQuotes]);
+  const sortedQuotes = useMemo(() => sortHistory(filteredQuotes, quoteSort, language === "zh" ? { draft: "草稿", booking: "待核对（押金已预留）", booked: "已生成 BOL", void: "已取消" } : {}), [filteredQuotes, quoteSort, language]);
+  const filteredOrders = useMemo(() => sortHistory(filteredQuotes.filter((quote) => quote.status === "booked" || quote.status === "void"), shipmentSort, {}), [filteredQuotes, shipmentSort]);
+
+  function historyHeader(key: HistorySortKey, label: string, shipment = false) {
+    const sort = shipment ? shipmentSort : quoteSort;
+    const active = sort?.key === key;
+    const nextDirection = active && sort.direction === "asc" ? "desc" : "asc";
+    const hint = language === "zh" ? `按${label}${nextDirection === "asc" ? "升序" : "降序"}排列` : `Sort ${label} ${nextDirection === "asc" ? "ascending" : "descending"}`;
+    return <th scope="col" aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : undefined}><button type="button" className={`history-sort-button${active ? " active" : ""}`} title={hint} aria-label={hint} onClick={() => (shipment ? setShipmentSort : setQuoteSort)((current) => nextHistorySort(current, key))}>{label}<span aria-hidden="true">{active ? (sort.direction === "asc" ? "↑" : "↓") : "↕"}</span></button></th>;
+  }
 
   function invalidateRates(message = "Shipment details changed. Get new rates before booking.") {
     if (rates.length || selectedRate !== null || bookingOpen) setQuoteMessage(message);
@@ -1568,8 +1580,8 @@ export default function Home() {
             ) : (
               <div className="quotes-table-wrap">
                 <table className="quotes-table">
-                  <thead><tr><th>{tx("Quote")}</th><th>Reference / PO</th><th>{tx("Route")}</th><th>{tx("Customer")}</th><th>{tx("Carrier")}</th><th>{tx("Ship date")}</th><th>{tx("Status")}</th><th>{tx("Price")}</th><th>{tx("Action")}</th></tr></thead>
-                  <tbody>{filteredQuotes.map((quote) => (
+                  <thead><tr>{historyHeader("quote_number", tx("Quote"))}{historyHeader("reference", "Reference / PO")}{historyHeader("route", tx("Route"))}{historyHeader("customer", tx("Customer"))}{historyHeader("carrier", tx("Carrier"))}{historyHeader("ready_date", tx("Ship date"))}{historyHeader("status", tx("Status"))}{historyHeader("price", tx("Price"))}<th scope="col">{tx("Action")}</th></tr></thead>
+                  <tbody>{sortedQuotes.map((quote) => (
                     <tr key={quote.id}>
                       <td><strong>{quote.quote_number}</strong><small>{new Date(quote.created_at).toLocaleDateString(language === "zh" ? "zh-CN" : "en-US")}</small></td>
                       <td>{quote.reference}</td>
@@ -1593,7 +1605,7 @@ export default function Home() {
           {savedQuotesError && <p className="quotes-error" role="alert">{savedQuotesError}</p>}
           {savedQuotesNotice && <p className="quotes-success" role="status">{savedQuotesNotice}</p>}
           <section className="panel saved-quotes-panel">
-            {savedQuotesLoading ? <p className="quotes-empty">{tx("Loading shipments…")}</p> : filteredOrders.length === 0 ? <div className="quotes-empty"><strong>{tx(historySearch ? "No matching orders." : "No orders yet.")}</strong><span>{historySearch ? tx("Try another search.") : language === "zh" ? "生成 BOL 后，运单会显示在这里。" : "Shipments appear after a BOL is generated."}</span></div> : <div className="quotes-table-wrap"><table className="quotes-table orders-table"><thead><tr><th>BOL</th><th>Reference / PO</th><th>{tx("Route")}</th><th>{tx("Customer")}</th><th>{tx("Carrier")}</th><th>{tx("Ship date")}</th><th>{tx("Status")}</th><th>{tx("Price")}</th><th>{tx("Action")}</th></tr></thead><tbody>{filteredOrders.map((quote) => <tr key={quote.id}><td><strong>{quote.bol_number || "—"}</strong><small>{quote.quote_number}</small></td><td>{quote.reference}</td><td>{quote.origin_zip} → {quote.destination_zip}</td><td>{quote.receiver?.company || "—"}</td><td><strong>{quote.carrier}</strong><small>{quote.service}</small></td><td>{quote.ready_date || "—"}</td><td><span className={`quote-status ${quote.status}`}>{quote.status}</span></td><td className="quote-price">${Number(quote.price).toFixed(2)}</td><td><div className="quote-actions order-actions"><button type="button" onClick={() => setSelectedOrder(quote)}>{tx("View details")}</button><details><summary>{language === "zh" ? "更多" : "More"}</summary><div className="order-action-options">{quote.bol_url && <a href={quote.bol_url} target="_blank" rel="noreferrer">{tx("Download BOL")}</a>}{quote.status === "booked" && quote.bol_number && <button type="button" onClick={() => { if (!printBol(quote)) window.alert(language === "zh" ? "请允许弹出窗口后重试。" : "Allow pop-ups and try again."); }}>{language === "zh" ? "打印 BOL" : "Print BOL"}</button>}{quote.status === "booked" && quote.bol_number && <button type="button" onClick={() => { if (!printShippingLabel(quote)) window.alert(language === "zh" ? "请允许弹出窗口后重试。" : "Allow pop-ups and try again."); }}>{language === "zh" ? "打印运输标签" : "Pallet Label"}</button>}{quote.status === "booked" ? <button type="button" className="void-button" onClick={() => void voidShipment(quote)} disabled={!authUser?.canSelfBook || quoteActionId === quote.id}>{quoteActionId === quote.id ? (language === "zh" ? "取消中…" : "Cancelling…") : tx("Void shipment")}</button> : <span>{tx("Pickup cancelled")}</span>}<button type="button" className="secondary-action" disabled={quote.status === "booking"} onClick={() => copyQuoteForRequote(quote)}>{tx("Copy & requote")}</button></div></details></div></td></tr>)}</tbody></table></div>}
+            {savedQuotesLoading ? <p className="quotes-empty">{tx("Loading shipments…")}</p> : filteredOrders.length === 0 ? <div className="quotes-empty"><strong>{tx(historySearch ? "No matching orders." : "No orders yet.")}</strong><span>{historySearch ? tx("Try another search.") : language === "zh" ? "生成 BOL 后，运单会显示在这里。" : "Shipments appear after a BOL is generated."}</span></div> : <div className="quotes-table-wrap"><table className="quotes-table orders-table"><thead><tr>{historyHeader("bol_number", "BOL", true)}{historyHeader("reference", "Reference / PO", true)}{historyHeader("route", tx("Route"), true)}{historyHeader("customer", tx("Customer"), true)}{historyHeader("carrier", tx("Carrier"), true)}{historyHeader("ready_date", tx("Ship date"), true)}{historyHeader("status", tx("Status"), true)}{historyHeader("price", tx("Price"), true)}<th scope="col">{tx("Action")}</th></tr></thead><tbody>{filteredOrders.map((quote) => <tr key={quote.id}><td><strong>{quote.bol_number || "—"}</strong><small>{quote.quote_number}</small></td><td>{quote.reference}</td><td>{quote.origin_zip} → {quote.destination_zip}</td><td>{quote.receiver?.company || "—"}</td><td><strong>{quote.carrier}</strong><small>{quote.service}</small></td><td>{quote.ready_date || "—"}</td><td><span className={`quote-status ${quote.status}`}>{quote.status}</span></td><td className="quote-price">${Number(quote.price).toFixed(2)}</td><td><div className="quote-actions order-actions"><button type="button" onClick={() => setSelectedOrder(quote)}>{tx("View details")}</button><details><summary>{language === "zh" ? "更多" : "More"}</summary><div className="order-action-options">{quote.bol_url && <a href={quote.bol_url} target="_blank" rel="noreferrer">{tx("Download BOL")}</a>}{quote.status === "booked" && quote.bol_number && <button type="button" onClick={() => { if (!printBol(quote)) window.alert(language === "zh" ? "请允许弹出窗口后重试。" : "Allow pop-ups and try again."); }}>{language === "zh" ? "打印 BOL" : "Print BOL"}</button>}{quote.status === "booked" && quote.bol_number && <button type="button" onClick={() => { if (!printShippingLabel(quote)) window.alert(language === "zh" ? "请允许弹出窗口后重试。" : "Allow pop-ups and try again."); }}>{language === "zh" ? "打印运输标签" : "Pallet Label"}</button>}{quote.status === "booked" ? <button type="button" className="void-button" onClick={() => void voidShipment(quote)} disabled={!authUser?.canSelfBook || quoteActionId === quote.id}>{quoteActionId === quote.id ? (language === "zh" ? "取消中…" : "Cancelling…") : tx("Void shipment")}</button> : <span>{tx("Pickup cancelled")}</span>}<button type="button" className="secondary-action" disabled={quote.status === "booking"} onClick={() => copyQuoteForRequote(quote)}>{tx("Copy & requote")}</button></div></details></div></td></tr>)}</tbody></table></div>}
           </section>
         </div>
 
