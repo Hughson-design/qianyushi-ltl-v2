@@ -216,4 +216,4 @@ Settings 已移除 Customer pricing；接口不再返回或保存平台默认加
 
 ## 导航名称调整（2026-11-20）
 
-Company Account 移到侧边栏 ACCOUNT 分组下；原 Settings 入口、页面标题及面包屑改名为 Profile（资料设置），保存按钮改为 Save profile。原有管理员权限、资料和报价渠道设置功能保持不变。
+Company Account 位于侧边栏 Settings（设置）分组下；原 Settings 入口、页面标题及面包屑改名为 Profile（资料设置），保存按钮改为 Save profile。原有管理员权限、资料和报价渠道设置功能保持不变。

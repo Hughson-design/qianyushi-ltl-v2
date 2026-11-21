@@ -1328,7 +1328,7 @@ export default function Home() {
           <button type="button" className={`nav-item ${view === "orders" ? "active" : ""}`} onClick={() => void showOrders()}><Icon>▣</Icon>{tx("Orders")}</button>
           <button type="button" className={`nav-item ${view === "reader" ? "active" : ""}`} onClick={() => setView("reader")}><Icon>▤</Icon>{language === "zh" ? "资料识别" : "Shipment reader"}</button>
           <button type="button" className={`nav-item ${view === "addresses" ? "active" : ""}`} onClick={() => void showAddressBookPage()}><Icon>⌂</Icon>{tx("Address book")}</button>
-          <p className="nav-label second">{tx("ACCOUNT")}</p>
+          <p className="nav-label second">{tx("Settings")}</p>
           {!authUser?.legacy && (platformAdmin || customerAdmin) && <button type="button" className={`nav-item ${view === "customers" || view === "quote-inputs" ? "active" : ""}`} onClick={() => void showCustomers()}><Icon>◎</Icon>{language === "zh" ? "公司账户" : "Company Account"}</button>}
           {authUser && !authUser.legacy && <button type="button" className={`nav-item ${view === "account" ? "active" : ""}`} onClick={() => {
             if (view !== "account") setAccountBack(view);
