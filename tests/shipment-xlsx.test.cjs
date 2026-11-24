@@ -6,7 +6,7 @@ const { stripTypeScriptTypes, createRequire } = require('node:module');
 const readExcelFile = require('read-excel-file/node').default;
 const { zipSync, strToU8 } = createRequire(require.resolve('read-excel-file/node'))('fflate');
 const source = stripTypeScriptTypes(fs.readFileSync('src/lib/xlsx-sheet-text.ts', 'utf8').replace(/^import .*;\r?\n/gm, '')).replace(/\bexport /g, '');
-const { xlsxSheetText, verifiedWorkbookFreight } = vm.runInNewContext(source + '\n;({xlsxSheetText,verifiedWorkbookFreight})', { readExcelFile, Buffer, Date });
+const { xlsxSheetText, verifiedWorkbookFreight, measuredPalletFreight } = vm.runInNewContext(source + '\n;({xlsxSheetText,verifiedWorkbookFreight,measuredPalletFreight})', { readExcelFile, Buffer, Date });
 function workbook() {
   const xml = (text) => strToU8(text);
   return Buffer.from(zipSync({
@@ -45,4 +45,28 @@ test('rejects corrupt and excessively expanded archives before parsing', async (
   const countOffset = bytes.length - 22 + 10;
   bytes.writeUInt16LE(65535, countOffset);
   await assert.rejects(xlsxSheetText(bytes), /Workbook/);
+});
+
+function warehouseRows(block = '41*47*75, 474lbs\n42*42*85, 1574lbs\n46*46*89, 744lbs\n46*44*89, 750lbs') {
+ return [['单号','托盘序号','长(cm)','宽(cm)','高(cm)','总重量（KG）','总件数','品名'], ['fixture','/',block,null,null,1637.55,97,'Lights']];
+}
+test('warehouse block yields four actual pallets in inches/lb without reusing template totals', () => {
+ const result=measuredPalletFreight(warehouseRows());
+ assert.equal(result.freight.split('\n').length,4);
+ assert.match(result.freight,/41×47×75 in, weight: 474 lb/);
+ assert.match(result.freight,/42×42×85 in, weight: 1574 lb/);
+ assert.equal((result.freight.match(/quantity: 1, Pallet/g)||[]).length,4);
+ assert.ok(!result.freight.includes('1637.55'));
+ assert.ok(result.warnings.some(w=>w.includes('1606.62')&&w.includes('30.93')));
+ assert.ok(result.warnings.some(w=>w.includes('英寸')));
+ assert.ok(result.warnings.some(w=>w.includes('97')));
+});
+test('explicit measured size units override inference and malformed or multiple shipments never lose cargo silently', () => {
+ const explicit=measuredPalletFreight(warehouseRows('100*80*90 cm, 474lb\n42*42*85 in, 1574lb'));
+ assert.match(explicit.freight,/100×80×90 cm/);
+ assert.match(explicit.freight,/42×42×85 in/);
+ assert.ok(!explicit.warnings.some(w=>w.includes('未单独标单位')));
+ assert.equal(measuredPalletFreight(warehouseRows('41*47*75, 474lbs\nunknown')),null);
+ const multiple=warehouseRows();multiple.push(['another','/','42*42*85, 1574lbs']);assert.equal(measuredPalletFreight(multiple),null);
+ const separate=warehouseRows();separate[1][3]=47;assert.equal(measuredPalletFreight(separate),null);
 });

@@ -43,7 +43,7 @@ test('private address means residential, preserving separately stated delivery s
   assert.equal(pickup.hasDeclaredDeliveryType, false);
   assert.match(reader.readerInstructions, /私人地址.*explicit residential/);
 });
-function harness({ signedIn = true, key = '', payload, status = 200, blocked = false, allowed = true, budgetDown = false, countFails = false, networkFails = false } = {}) {
+function harness({ signedIn = true, key = '', payload, status = 200, blocked = false, allowed = true, budgetDown = false, countFails = false, networkFails = false, workbookOverride } = {}) {
   const requests = [], counts = [], settlements = [], reservations = [];
   const quota = { day: "2026-11-20", used: 0, reserved: 0, limit: 200000, remaining: blocked ? 0 : 200000, blocked, resetAt: "2026-11-21T00:00:00Z" };
   const route = load('src/app/api/shipment-reader/route.ts', ['GET', 'POST'], {
@@ -51,7 +51,7 @@ function harness({ signedIn = true, key = '', payload, status = 200, blocked = f
     getReaderQuota: async () => { if (budgetDown) throw Error("Unavailable"); return quota; },
     reserveReaderTokens: async tokens => { reservations.push(tokens); return { allowed, id: allowed ? "fixture-reservation" : undefined, quota }; },
     settleReaderTokens: async (id, actual, block) => { settlements.push({ id, actual, block }); return { ...quota, blocked: Boolean(block) }; },
-    xlsxSheetText: async () => ({ text: 'Worksheet: Freight\nRow 1: [[1,"重量(KG)"],[2,"长(cm)"]]\nRow 2: [[1,100],[2,108]]', freight: 'quantity: 1, Crate, 1 pieces, 108×65×69 cm, 100 kg, commodity: Screen\nquantity: 4, Crate, 4 pieces, 105×59×68 cm, 109 kg, commodity: Screen' }),
+    xlsxSheetText: async () => workbookOverride ?? ({ text: 'Worksheet: Freight\nRow 1: [[1,"重量(KG)"],[2,"长(cm)"]]\nRow 2: [[1,100],[2,108]]', freight: 'quantity: 1, Crate, 1 pieces, 108×65×69 cm, 100 kg, commodity: Screen\nquantity: 4, Crate, 4 pieces, 105×59×68 cm, 109 kg, commodity: Screen' }),
     NextResponse: { json: (body, options) => Response.json(body, options) },
     requireAppSession: async () => signedIn ? { session: { userId: 'test-user', customerId: 'test-customer' } } : { response: Response.json({ error: 'Sign in' }, { status: 401 }) },
     process: { env: { OPENAI_API_KEY: key } },
@@ -155,4 +155,15 @@ test('uncertain network results conservatively consume the full reservation', as
   const app = harness({ key: 'test', networkFails: true });
   assert.ok((await app.POST(app.request({ ai: true }))).status >= 400);
   assert.equal(app.settlements.length, 1); assert.equal(app.settlements[0].actual, null);
+});
+
+
+test('warehouse warnings survive API result and do not claim summary reconciliation', async () => {
+ const freight='quantity: 1, Pallet, dimensions: 41×47×75 in, weight: 474 lb\nquantity: 1, Pallet, dimensions: 42×42×85 in, weight: 1574 lb';
+ const app=harness({key:'test',workbookOverride:{text:'warehouse fixture',freight,freightSource:'warehouse',warnings:['实测与汇总相差30.93 kg；已按实测。','尺寸按英寸识别，请核对。']}});
+ const result=await(await app.POST(app.request({ai:true,value:'',files:[new File(['fixture'],'warehouse.xlsx')]}))).json();
+ assert.equal(result.parsed.items.length,2);
+ assert.equal(result.parsed.items[0].pallets,'1');assert.equal(result.parsed.items[0].unitWeight,'474');assert.equal(result.parsed.items[0].length,'41');
+ assert.ok(result.warnings.some(w=>w.includes('30.93')));
+ assert.ok(!result.warnings.some(w=>w.includes('核对一致')));
 });

@@ -46,6 +46,8 @@ export async function POST(request: Request) {
     const binaryFiles: File[] = [];
     let hasWorkbook = false;
     let verifiedFreight: string | null = null;
+    let freightSource = "verified";
+    const workbookWarnings: string[] = [];
     for (const file of files) {
       if (["txt", "csv", "tsv"].includes(readerExtension(file.name))) text += `\n${await file.text()}`;
       else if (readerExtension(file.name) === "xlsx") {
@@ -53,7 +55,11 @@ export async function POST(request: Request) {
         try {
           const workbook = await xlsxSheetText(Buffer.from(await file.arrayBuffer()));
           text += `\nEXCEL CELL DATA (column numbers match the header row; blank merged cells are not new shipments):\n${workbook.text}`;
-          if (files.length === 1 && !String(rawText ?? "").trim()) verifiedFreight = workbook.freight;
+          workbookWarnings.push(...(workbook.warnings ?? []));
+          if (files.length === 1 && !String(rawText ?? "").trim()) {
+            verifiedFreight = workbook.freight;
+            freightSource = workbook.freightSource ?? "verified";
+          }
         }
         catch { return json({ error: "无法读取 Excel 单元格，请使用未加密的 .xlsx 文件，或截取一票货物后重试。" }, 400); }
         hasWorkbook = true;
@@ -125,13 +131,13 @@ export async function POST(request: Request) {
     if (output.some((part: { type?: string }) => part.type === "refusal")) return json({ error: "该资料未能识别，请更换文件或直接粘贴货运文字。" }, 422);
     const decoded = JSON.parse(output.filter((part: { type?: string }) => part.type === "output_text").map((part: { text?: string }) => part.text ?? "").join(""));
     if (typeof decoded.shipmentText !== "string" || typeof decoded.originalText !== "string" || !Array.isArray(decoded.warnings) || decoded.warnings.length > 100 || decoded.warnings.some((value: unknown) => typeof value !== "string" || value.length > 2000)) throw new Error("Invalid recognition result");
-    const warnings: string[] = [...decoded.warnings];
+    const warnings: string[] = [...decoded.warnings, ...workbookWarnings];
     if (hasWorkbook || binaryFiles.some((file) => readerExtension(file.name) === "xls")) warnings.push("Excel 按单元格读取，每个工作表最多识别前 1,000 行；请核对每行货物与合计重量。" );
     if (hasWorkbook || binaryFiles.some((file) => ["doc", "docx", "xls"].includes(readerExtension(file.name)))) warnings.push("Word / Excel 中的嵌入图片不参与文字识别；如有图片资料，请另传截图或转成 PDF。");
     let shipmentText = decoded.shipmentText;
     if (verifiedFreight && /^提货地址：[^\n]+\n收货地址：[^\n]+(?:\n|$)/.test(shipmentText)) {
       shipmentText = [...shipmentText.split(/\r?\n/).slice(0, 2), verifiedFreight].join("\n");
-      warnings.push("货物数量、尺寸和重量已按 Excel 明细单元格计算，并与整票总重量核对一致；请确认包装及地址服务要求。");
+      if (freightSource !== "warehouse") warnings.push("货物数量、尺寸和重量已按 Excel 明细单元格计算，并与整票总重量核对一致；请确认包装及地址服务要求。");
     }
     return json({ ...readerResult(shipmentText, decoded.originalText, warnings, "ai"), model: READER_MODEL, quota });
   } catch (error) {
