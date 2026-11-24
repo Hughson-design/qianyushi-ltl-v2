@@ -780,3 +780,37 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .help-list ul { margin: 12px 14px 14px; padding-left: 20px; color: #45514c; font-size: 12px; line-height: 1.75; }
 .help-list li + li { margin-top: 8px; }
 .help-list pre { margin: 0 14px 14px; padding: 12px; border: 1px solid var(--line); border-radius: 7px; background: white; color: #34473c; font-size: 11px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Keep freight on one compact row when space permits, without hiding fields. */
+.freight-list { container-type: inline-size; }
+.freight-item { padding: 9px 7px; }
+.freight-item + .freight-item { margin-top: 7px; }
+.freight-line-scroll { overflow: visible; padding: 0; }
+.freight-grid-v3 { min-width: 0; grid-template-columns: 24px 66px 40px 32px 32px repeat(3, minmax(48px, .8fr)) repeat(2, minmax(56px, 1fr)) 36px 72px 40px minmax(80px, 1.5fr) minmax(54px, 1fr); gap: 8px 3px; }
+.freight-grid-v3 > * { min-width: 0; }
+.freight-grid-v3 .input-group > label { display: flex; align-items: flex-end; min-height: 25px; margin-bottom: 4px; font-size: 9px; line-height: 1.2; overflow-wrap: anywhere; }
+.freight-grid-v3 .input-group input, .freight-grid-v3 .input-group select { min-width: 0; height: 33px; padding-inline: 4px; font-size: 11px; border-radius: 5px; }
+.freight-grid-v3 .input-group select { padding-inline: 2px; }
+.freight-grid-v3 .field-with-unit span { display: none; }
+.freight-grid-v3 .money-field input { padding-left: 13px; }
+.freight-grid-v3 .money-field span { left: 4px; top: 10px; font-size: 10px; }
+.freight-grid-v3 input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+.freight-grid-v3 input[type="number"]::-webkit-inner-spin-button, .freight-grid-v3 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.freight-grid-v3 .line-index { min-height: 33px; align-self: end; justify-content: center; }
+.freight-grid-v3 .line-index > div { height: auto; gap: 2px; }
+.freight-grid-v3 .line-index span { font-size: 7px; }
+.freight-grid-v3 .line-index strong { font-size: 15px; }
+.freight-grid-v3 .line-remove { height: auto; max-width: 24px; margin-top: 3px; overflow-wrap: anywhere; }
+.freight-grid-v3 .line-remove-placeholder { display: none; }
+@container (max-width: 879px) {
+  .freight-grid-v3 { grid-template-columns: 26px minmax(72px, 1.3fr) repeat(6, minmax(0, 1fr)); column-gap: 6px; }
+  .freight-grid-v3 > :nth-child(14) { grid-column: span 2; }
+}
+@container (max-width: 560px) {
+  .freight-grid-v3 { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .freight-grid-v3 .line-index { grid-column: 1 / -1; min-height: 16px; flex-direction: row; justify-content: space-between; align-items: center; }
+  .freight-grid-v3 .line-remove { max-width: none; margin-top: 0; font-size: 10px; }
+  .freight-grid-v3 > :nth-child(14), .freight-grid-v3 > :nth-child(15) { grid-column: span 2; }
+  .freight-grid-v3 .input-group > label { min-height: 20px; font-size: 10px; }
+  .freight-grid-v3 .input-group input, .freight-grid-v3 .input-group select { height: 38px; font-size: 14px; }
+}
