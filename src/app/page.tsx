@@ -224,7 +224,7 @@ const chineseTranslations: Record<string, string> = {
   "Account Balance": "押金余额",
   "My Account": "我的账户",
   "Platform Settings": "平台设置",
-  "Quote Input History": "询价原文记录",
+  "Query History": "查询记录",
   "PLATFORM SETTINGS": "平台设置",
   "Loading shipments…": "正在加载运单…",
   "No matching shipments.": "没有符合条件的运单。",
@@ -1241,7 +1241,7 @@ export default function Home() {
   const platformAdmin = authUser?.role === "admin";
   const companyTitle = tx(platformAdmin ? "Customers & Users" : "Company Account");
   const depositTitle = tx(platformAdmin ? "Deposits" : "Account Balance");
-  const pageTitles: Record<View, string> = { new: tx("New Quote"), quotes: tx("Saved Quotes"), orders: tx("Shipments"), reader: tx("Smart Import"), addresses: tx("Address Book"), customers: companyTitle, deposit: depositTitle, account: tx("My Account"), settings: tx("Platform Settings"), "quote-inputs": tx("Quote Input History") };
+  const pageTitles: Record<View, string> = { new: tx("New Quote"), quotes: tx("Saved Quotes"), orders: tx("Shipments"), reader: tx("Smart Import"), addresses: tx("Address Book"), customers: companyTitle, deposit: depositTitle, account: tx("My Account"), settings: tx("Platform Settings"), "quote-inputs": tx("Query History") };
   const breadcrumbItems = view === "quote-inputs" ? [companyTitle, pageTitles[view]] : [tx(["new", "quotes", "orders", "reader", "addresses"].includes(view) ? "Shipping" : "Settings"), pageTitles[view]];
   const customerAdmin = authUser?.role === "customer_admin";
   const customerAdminLabel = language === "zh" ? "客户管理员" : "Customer administrator";
@@ -1633,7 +1633,7 @@ export default function Home() {
             <nav className="company-account-nav" aria-label={companyTitle}>
               <button type="button" onClick={() => { setAccountBack("customers"); setView("account"); }}>{tx("My Account")}</button>
               <span aria-current="page">{companyTitle}</span>
-              <button type="button" onClick={() => setView("quote-inputs")}>{tx("Quote Input History")}</button>
+              <button type="button" onClick={() => setView("quote-inputs")}>{tx("Query History")}</button>
               <button type="button" onClick={() => void showSavedQuotes()}>{tx("Saved Quotes")}</button>
             </nav>
           </section>

@@ -35,24 +35,24 @@ export function QuoteInputHistory({ language, companyName, accountTitle, onUsers
 
   return <div className="content workspace-page company-account">
     <header className="page-heading">
-      <div><h1>{copy("Quote Input History", "询价原文记录")}</h1><p>{accountTitle} · {companyName}</p></div>
+      <div><h1>{copy("Query History", "查询记录")}</h1><p>{accountTitle} · {companyName}</p></div>
       <nav className="company-account-nav" aria-label={copy("Company account", "公司账户")}>
         <button type="button" onClick={onProfile}>{copy("My Account", "我的账户")}</button>
         <button type="button" onClick={onUsers}>{accountTitle}</button>
-        <span aria-current="page">{copy("Quote Input History", "询价原文记录")}</span>
+        <span aria-current="page">{copy("Query History", "查询记录")}</span>
         <button type="button" onClick={onQuotes}>{copy("Saved Quotes", "已保存报价")}</button>
       </nav>
     </header>
     <div className="company-user-toolbar">
-      <span>{copy("Submission times use Pacific Time (PT).", "提交时间按太平洋时间（PT）显示。")}</span>
+      <span>{copy("Times use Pacific Time (PT). Source indicates the Mobile Quick Quote page or desktop workspace.", "时间按太平洋时间（PT）显示。来源按手机快速询价页或电脑端主页面区分。")}</span>
     </div>
     {error && <p role="alert" className="quotes-error">{error}</p>}
     {loading && <p role="status">{copy("Loading…", "加载中…")}</p>}
     {!loading && !error && <div className="quote-input-records">
-      {records.length === 0 && <p className="panel">{copy("No quote inputs recorded yet.", "暂无询价原文记录。")}</p>}
+      {records.length === 0 && <p className="panel">{copy("No queries recorded yet.", "暂无查询记录。")}</p>}
       {records.map((row) => <article className="panel quote-input-record" key={row.id}>
         <header>
-          <strong>#{row.id}</strong>
+          <div className="query-record-heading"><strong>#{row.id}</strong><span className="query-source-badge" data-source={row.source === "mobile" || row.source === "desktop" ? row.source : "unknown"}>{row.source === "mobile" ? copy("Mobile page query", "手机页面查询") : row.source === "desktop" ? copy("Desktop page query", "电脑页面查询") : copy("Source unknown", "来源未知")}</span></div>
           <time dateTime={row.created_at}>{new Intl.DateTimeFormat(language === "zh" ? "zh-CN" : "en-US", { timeZone: "America/Los_Angeles", dateStyle: "short", timeStyle: "medium" }).format(new Date(row.created_at))} PT</time>
         </header>
         <p>{row.customer_name} · {row.user_name || row.user_email}{row.user_name && ` · ${row.user_email}`}</p>
