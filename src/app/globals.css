@@ -786,7 +786,7 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .freight-item { padding: 9px 7px; }
 .freight-item + .freight-item { margin-top: 7px; }
 .freight-line-scroll { overflow: visible; padding: 0; }
-.freight-grid-v3 { min-width: 0; grid-template-columns: 24px 66px 46px 34px 34px repeat(3, 48px) repeat(2, 68px) 42px 76px 46px 100px 68px; gap: 8px 4px; }
+.freight-grid-v3 { min-width: 0; grid-template-columns: 24px minmax(66px, .7fr) minmax(46px, .45fr) repeat(2, minmax(34px, .2fr)) repeat(3, minmax(48px, .35fr)) repeat(2, minmax(68px, 1.6fr)) minmax(42px, .5fr) minmax(76px, 1fr) minmax(46px, .45fr) minmax(100px, .65fr) minmax(68px, .35fr); gap: 8px 4px; }
 .freight-grid-v3 > * { min-width: 0; }
 .freight-grid-v3 .input-group > label { display: flex; align-items: flex-end; min-height: 25px; margin-bottom: 4px; font-size: 9px; line-height: 1.2; overflow-wrap: anywhere; }
 .freight-grid-v3 .input-group input, .freight-grid-v3 .input-group select { min-width: 0; height: 33px; padding-inline: 4px; font-size: 11px; border-radius: 5px; }
@@ -803,7 +803,7 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .freight-grid-v3 .line-remove { height: auto; max-width: 24px; margin-top: 3px; overflow-wrap: anywhere; }
 .freight-grid-v3 .line-remove-placeholder { display: none; }
 @container (max-width: 989px) {
-  .freight-grid-v3 { grid-template-columns: 24px 76px 48px 40px 40px repeat(3, 56px); column-gap: 6px; }
+  .freight-grid-v3 { grid-template-columns: 24px minmax(76px, 1.4fr) minmax(48px, .8fr) repeat(2, minmax(40px, .6fr)) repeat(3, minmax(56px, 1fr)); column-gap: 6px; }
   .freight-grid-v3 > :nth-child(14) { grid-column: span 2; }
 }
 @container (max-width: 560px) {
