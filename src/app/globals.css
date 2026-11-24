@@ -786,7 +786,7 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .freight-item { padding: 9px 7px; }
 .freight-item + .freight-item { margin-top: 7px; }
 .freight-line-scroll { overflow: visible; padding: 0; }
-.freight-grid-v3 { min-width: 0; grid-template-columns: 24px 66px 40px 32px 32px repeat(3, minmax(48px, .8fr)) repeat(2, minmax(56px, 1fr)) 36px 72px 40px minmax(80px, 1.5fr) minmax(54px, 1fr); gap: 8px 3px; }
+.freight-grid-v3 { min-width: 0; grid-template-columns: 24px 66px 46px 34px 34px repeat(3, 48px) repeat(2, 68px) 42px 76px 46px 100px 68px; gap: 8px 4px; }
 .freight-grid-v3 > * { min-width: 0; }
 .freight-grid-v3 .input-group > label { display: flex; align-items: flex-end; min-height: 25px; margin-bottom: 4px; font-size: 9px; line-height: 1.2; overflow-wrap: anywhere; }
 .freight-grid-v3 .input-group input, .freight-grid-v3 .input-group select { min-width: 0; height: 33px; padding-inline: 4px; font-size: 11px; border-radius: 5px; }
@@ -802,8 +802,8 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
 .freight-grid-v3 .line-index strong { font-size: 15px; }
 .freight-grid-v3 .line-remove { height: auto; max-width: 24px; margin-top: 3px; overflow-wrap: anywhere; }
 .freight-grid-v3 .line-remove-placeholder { display: none; }
-@container (max-width: 879px) {
-  .freight-grid-v3 { grid-template-columns: 26px minmax(72px, 1.3fr) repeat(6, minmax(0, 1fr)); column-gap: 6px; }
+@container (max-width: 989px) {
+  .freight-grid-v3 { grid-template-columns: 24px 76px 48px 40px 40px repeat(3, 56px); column-gap: 6px; }
   .freight-grid-v3 > :nth-child(14) { grid-column: span 2; }
 }
 @container (max-width: 560px) {
@@ -814,3 +814,6 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 38px;
   .freight-grid-v3 .input-group > label { min-height: 20px; font-size: 10px; }
   .freight-grid-v3 .input-group input, .freight-grid-v3 .input-group select { height: 38px; font-size: 14px; }
 }
+
+.freight-grid-v3 .line-index > div { flex-direction: column; align-items: center; gap: 1px; }
+.freight-grid-v3 .line-index span { white-space: nowrap; }
