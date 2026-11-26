@@ -30,12 +30,29 @@ export async function POST(request: Request) {
     if (email && (!/^\S+@\S+\.\S+$/.test(email) || !userName || password.length < 8)) {
       return NextResponse.json({ error: "For a login user, enter a valid email, name, and password of at least 8 characters." }, { status: 400 });
     }
+    // Check both identifiers before creating anything: the login is optional,
+    // but a known email conflict must not leave a half-created customer behind.
+    const [codeCheck, emailCheck] = await Promise.all([
+      supabaseRequest(`customers?select=id&code=eq.${encodeURIComponent(code)}&limit=1`),
+      email ? supabaseRequest(`app_users?select=user_id&email=eq.${encodeURIComponent(email)}&limit=1`) : Promise.resolve(null),
+    ]);
+    if (!codeCheck.ok || (emailCheck && !emailCheck.ok)) return NextResponse.json({ error: "暂时无法核对客户代码或邮箱，请稍后重试。 / Unable to check customer identifiers. Try again later." }, { status: 503 });
+    const [matchingCodes, matchingEmails] = await Promise.all([codeCheck.json(), emailCheck ? emailCheck.json() : Promise.resolve([])]);
+    if (!Array.isArray(matchingCodes) || !Array.isArray(matchingEmails)) return NextResponse.json({ error: "暂时无法核对客户资料，请稍后重试。 / Unable to verify customer details." }, { status: 503 });
+    const conflicts: string[] = [];
+    if (matchingCodes.length) conflicts.push("客户代码已被使用，请换一个唯一代码。 / Customer code is already in use; choose another code.");
+    if (matchingEmails.length) conflicts.push("邮箱已绑定现有登录用户，请使用其他邮箱；如需调整原用户，请在用户管理中编辑。 / Email already belongs to a login user; use another email or edit the existing user.");
+    if (conflicts.length) return NextResponse.json({ code: "CUSTOMER_IDENTIFIER_CONFLICT", error: conflicts.join("\n") }, { status: 409 });
     const customerResponse = await supabaseRequest("customers", {
       method: "POST",
       headers: { Prefer: "return=representation" },
       body: JSON.stringify({ name, code, active: true, can_self_book: body.canSelfBook !== false, markup_percent: Math.max(0, Number(body.markupPercent) || 0), minimum_markup: Math.max(0, Number(body.minimumMarkup) || 0) }),
     });
-    if (!customerResponse.ok) return NextResponse.json({ error: await responseError(customerResponse, "Unable to create the customer.") }, { status: 502 });
+    if (!customerResponse.ok) {
+      const failure = await customerResponse.clone().json().catch(() => null);
+      if (failure?.code === "23505") return NextResponse.json({ code: "CUSTOMER_IDENTIFIER_CONFLICT", error: "客户代码已被使用，请换一个唯一代码。 / Customer code is already in use; choose another code." }, { status: 409 });
+      return NextResponse.json({ error: await responseError(customerResponse, "Unable to create the customer.") }, { status: 502 });
+    }
     const customer = (await customerResponse.json())[0];
     await supabaseRequest("deposit_accounts", { method: "POST", body: JSON.stringify({ customer_id: customer.id, available_balance: 0 }) });
 
