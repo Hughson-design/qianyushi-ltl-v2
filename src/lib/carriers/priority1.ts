@@ -19,6 +19,7 @@ const accessorialCodes: Record<string, string> = {
   "Liftgate at delivery": "LGDEL",
   "Residential pickup": "RESPU",
   "Residential delivery": "RESDEL",
+  "Limited access": "LTDDEL",
   "Appointment delivery": "APPT",
 };
 
@@ -78,7 +79,7 @@ export async function getPriority1Rates(input: QuoteRequest): Promise<Normalized
         service: String(quote.serviceLevelDescription || quote.serviceLevel || "Standard LTL"),
         transitDays: Number.isFinite(Number(quote.transitDays)) ? Number(quote.transitDays) : null,
         price,
-        providerRef: { quoteId: Number(quote.id) },
+        providerRef: { quoteId: Number(quote.id), ...(input.services.includes("Limited access") ? { limitedAccessCode: "LTDDEL" } : {}) },
       };
     })
     .filter((rate: NormalizedRate | null): rate is NormalizedRate => rate !== null);
@@ -125,6 +126,9 @@ function priority1Error(data: unknown, status: number) {
 }
 
 export async function dispatchPriority1Shipment(quote: StoredQuote, reconcileOnly = false): Promise<ShipmentBookingResult> {
+  if (!reconcileOnly && quote.services?.includes("Limited access") && quote.provider_ref?.limitedAccessCode !== "LTDDEL") {
+    throw new NoShipmentSubmissionError("Limited access 报价需重新获取，请复制并重新报价。 / Get fresh Priority1 rates including Limited Access before booking.");
+  }
   if (quote.freight_items.some((item) => item.hazmat)) {
     throw new Error("Hazmat BOL requires UN number, shipping name, hazard class, and packing group.");
   }

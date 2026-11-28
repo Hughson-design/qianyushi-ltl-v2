@@ -252,3 +252,8 @@ Company Account 位于侧边栏 Settings（设置）分组下；原 Settings 入
 ### 新建客户重复提示（2026-11-26）
 
 新建客户前，先核对客户代码及可选首位用户邮箱是否已被使用。重复时返回409及明确提示，不创建客户、押金账户或登录用户；唯一约束的并发冲突也转为安全提示，不暴露数据库细节。仅在核对成功后继续原有创建流程，无需数据库变更。
+
+
+### Priority1 Limited access 修复（2026-11-27）
+
+补上 Limited access → LTDDEL（Limited Access Delivery）的询价映射，保留尾门、住宅和预约等原有服务。不手工添加固定附加费，价格使用Priority1返回的总额。官方参考：https://api.priority1.com/about 。V2 dispatch按quoteId使用已定价的报价；旧的Limited access草稿缺少已正确询价的标记时，要求重新询价并在押金预留前阻止出单。已有待核对运单仍允许只核对、不重复下单。73项本地测试通过；正式接口价格对照未执行，需单独批准。无需SQL。

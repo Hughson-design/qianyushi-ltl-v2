@@ -26,6 +26,7 @@ export function bookingParty(value: unknown): ShipmentParty {
 }
 
 export function validateBooking(quote: StoredQuote) {
+  if (quote.provider === "priority1" && quote.services?.includes("Limited access") && quote.provider_ref?.limitedAccessCode !== "LTDDEL") throw new Error("Limited access 报价需重新获取，请复制并重新报价。 / Get fresh Priority1 rates including Limited Access before booking.");
   if (!["priority1", "wwex", "tql"].includes(quote.provider)) throw new Error("This provider does not support booking.");
   bookingParty(quote.sender); bookingParty(quote.receiver);
   if (!quote.reference.trim() || quote.reference.length > 300) throw new Error("Enter a reference of 1 to 300 characters.");

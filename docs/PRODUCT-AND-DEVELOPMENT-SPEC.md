@@ -338,7 +338,7 @@ Class 使用 NMFC 常见 13 档密度估算。该结果只是报价输入辅助�
 | Residential Pickup | 已映射 `RESPU` | 已映射 |
 | Residential Delivery | 已映射 `RESDEL` | 已映射 |
 | Appointment Delivery | 已映射 `APPT` | 已映射 |
-| Limited Access | 当前未映射 | 作为目的地 Location Type 映射 |
+| Limited Access | 已映射派送 `LTDDEL` | 作为目的地 Location Type 映射 |
 | Overlength | 当前未映射 | 当前未映射 |
 
 未映射的服务不能被视为已进入承运商计价；生产上线前必须根据每个平台正式文档补齐。
@@ -708,7 +708,7 @@ Shipment、Party 和 Provider Reference 使用 JSONB，便于适配多个承运�
 1. 主页面 `page.tsx` 较大，后续应按 View 和业务组件拆分。
 2. 当前 SQL 是迭代脚本集合，建议上线前合并为带版本号的正式 Migration。
 3. Platform Settings 同时保留默认加价，但当前客户加价优先。
-4. Priority1 的 Limited Access 和 Overlength 尚未映射。
+4. Priority1 的 Limited Access 已映射 LTDDEL（派送）；Overlength 尚未映射。
 5. WWEX Overlength 尚未映射。
 6. 危险品只能报价标记，不能出 BOL。
 7. Priority1 恢复既有记录时可能没有可下载的 BOL URL。
