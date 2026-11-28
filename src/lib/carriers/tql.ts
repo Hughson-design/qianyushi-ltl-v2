@@ -172,7 +172,7 @@ export async function getTqlRates(input: QuoteRequest): Promise<NormalizedRate[]
     cache: "no-store",
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(tqlError(data, response.status, "quote"));
+  if (!response.ok) throw Object.assign(new Error(tqlError(data, response.status, "quote")), { quoteHttpStatus: response.status });
   const content = data?.content || {};
   const quoteId = Number(content.quoteId);
   const prices = Array.isArray(content.carrierPrices) ? content.carrierPrices : [];

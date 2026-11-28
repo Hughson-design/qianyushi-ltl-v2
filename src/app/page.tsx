@@ -1113,6 +1113,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
         body: JSON.stringify({
+          ...(new URLSearchParams(window.location.search).get("rateProvider") === "tql" ? { onlyProvider: "tql" } : {}),
           originZip: parsed?.originZip ?? origin,
           destinationZip: parsed?.destinationZip ?? destination,
           originAddress: parsed?.originAddress ?? originAddress,

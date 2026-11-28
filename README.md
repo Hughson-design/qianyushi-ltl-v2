@@ -268,3 +268,8 @@ Mothership新增delivery.limitedAccess。住宅未明确请求电话预约时发
 Overlength freight在四个平台均暂停自动报价并提示人工核实，不再将勾选项静默忽略。虽然Priority1公开ELS_6至ELS_30等代码，但尚未确认长度区间及承运商计费规则，不凭代码名称推断，也不手工加固定费用。确认规则后再实现。未勾选超长时仍按原逻辑传递真实尺寸，此修复不保证所有尺寸条件的超长费均已核实。
 
 参考：Priority1 https://api.priority1.com/about；Mothership https://docs.mothership.com/reference/accessorials 及 https://docs.mothership.com/reference/createquote；TQL和WWEX使用其提供的接口说明与Postman样例。无需SQL。80项离线测试及完整构建通过；本次未向任何承运商发送真实询价或出单。
+
+
+### TQL 单平台诊断（2026-11-28）
+
+总管理员可通过 ?rateProvider=tql 使用同一询价表单，仅向TQL询价；服务端验证管理员和同源请求，在调用任何承运商前排除其他渠道，不改变已保存的平台设置。普通询价保持原行为。诊断显示认证响应格式或询价HTTP状态，不展示凭据或承运商响应值；仍遵循当前客户加价与服务检查。83项离线测试通过，包含JSON/流式隔离、非管理员拒绝及TQL停用时不调用其他渠道。

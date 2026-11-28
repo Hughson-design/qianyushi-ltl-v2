@@ -158,6 +158,11 @@ async function quoteResponse(request: Request, emit?: (event: object) => void) {
     const customerId = auth.session.customerId;
     if (!customerId) return NextResponse.json({ error: "An active customer account is required." }, { status: 403 });
     const body = await request.json();
+    const diagnostic = body.onlyProvider !== undefined;
+    if (diagnostic && (auth.session.role !== "admin" || request.headers.get("origin") !== new URL(request.url).origin)) {
+      return NextResponse.json({ error: "Administrator access from this website is required for isolated diagnosis." }, { status: 403 });
+    }
+    if (diagnostic && body.onlyProvider !== "tql") return NextResponse.json({ error: "Only TQL isolated diagnosis is supported." }, { status: 400 });
     const originZip = String(body.originZip || "").trim();
     const destinationZip = String(body.destinationZip || "").trim();
     const readyDate = String(body.readyDate || "").trim();
@@ -191,7 +196,7 @@ async function quoteResponse(request: Request, emit?: (event: object) => void) {
     const providerErrors: Record<string, string> = {};
     const providerNotices: Record<string, string> = {};
     const batches = await Promise.all(providers.map(async ({ id, enabled, getRates }) => {
-      if (!enabled) {
+      if (!enabled || (diagnostic && id !== "tql")) {
         emit?.({ type: "provider", id, status: "disabled" });
         return [];
       }
@@ -215,6 +220,14 @@ async function quoteResponse(request: Request, emit?: (event: object) => void) {
         return rates;
       } catch (error) {
         providerErrors[id] = id === "mothership" ? "Mothership quote failed." : error instanceof Error ? error.message : "Carrier quote failed.";
+        if (diagnostic && id === "tql") {
+          // Never surface identity response values, carrier payloads, or credentials.
+          const message = error instanceof Error ? error.message : "";
+          const quoteStatus = (error as { quoteHttpStatus?: unknown } | null)?.quoteHttpStatus;
+          providerNotices[id] = /^TQL authentication returned HTTP/.test(message) ? message
+            : typeof quoteStatus === "number" ? `TQL quote returned HTTP ${quoteStatus}. Authentication completed; the quoting endpoint rejected the request.`
+            : "TQL request could not complete. Check connectivity and server configuration.";
+        }
         emit?.({ type: "provider", id, status: "failed", elapsedMs: Math.round(performance.now() - started) });
         return [];
       }

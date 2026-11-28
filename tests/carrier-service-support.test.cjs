@@ -51,11 +51,11 @@ test('old incompatible drafts are rejected before contact checks and deposit res
   assert.throws(() => safe.validateBooking({ provider: 'wwex', services: ['Residential delivery','Limited access'] }), /cannot both/);
   assert.throws(() => safe.validateBooking({ provider: 'priority1', services: ['Overlength freight'] }), /Overlength/);
 });
-function routeHarness() {
+function routeHarness({ role = "admin", tqlFailure = false, tqlEnabled = true } = {}) {
   const calls = [];
-  const rate = provider => async () => { calls.push(provider); return [{ provider, price: 100, providerRef: {} }]; };
-  const api = load('src/app/api/quotes/rates/route.ts', 'POST', { ...support, postalCities: {}, issueQuoteToken: () => 'fixture', requireAppSession: async () => ({ session: { customerId: 'fixture' } }), supabaseRequest: async path => Response.json(path.startsWith('platform_settings') ? [{ wwex_enabled: true, priority1_enabled: true, tql_enabled: true, mothership_enabled: true }] : [{ active: true, markup_percent: 0, minimum_markup: 0 }]), mothershipRatesEnabled: () => true, getWwexRates: rate('wwex'), getPriority1Rates: rate('priority1'), getTqlRates: rate('tql'), getMothershipRates: rate('mothership') });
-  return { calls, post: (services, stream) => api.POST(new Request('https://fixture.invalid/api/quotes/rates', { method: 'POST', headers: { accept: stream ? 'application/x-ndjson' : 'application/json' }, body: JSON.stringify({ originZip: '91710', destinationZip: '76132', readyDate: '2026-11-30', items: [{ pallets: 1, unitWeight: 500, length: 48, width: 40, height: 48 }], services }) })) };
+  const rate = provider => async () => { calls.push(provider); if (provider === 'tql' && tqlFailure) throw Object.assign(new Error('private carrier payload'), { quoteHttpStatus: 400 }); return [{ provider, price: 100, providerRef: {} }]; };
+  const api = load('src/app/api/quotes/rates/route.ts', 'POST', { ...support, postalCities: {}, issueQuoteToken: () => 'fixture', requireAppSession: async () => ({ session: { customerId: 'fixture', role } }), supabaseRequest: async path => Response.json(path.startsWith('platform_settings') ? [{ wwex_enabled: true, priority1_enabled: true, tql_enabled: tqlEnabled, mothership_enabled: true }] : [{ active: true, markup_percent: 0, minimum_markup: 0 }]), mothershipRatesEnabled: () => true, getWwexRates: rate('wwex'), getPriority1Rates: rate('priority1'), getTqlRates: rate('tql'), getMothershipRates: rate('mothership') });
+  return { calls, post: (services, stream, onlyProvider) => api.POST(new Request('https://fixture.invalid/api/quotes/rates', { method: 'POST', headers: { origin: 'https://fixture.invalid', accept: stream ? 'application/x-ndjson' : 'application/json' }, body: JSON.stringify({ originZip: '91710', destinationZip: '76132', readyDate: '2026-11-30', items: [{ pallets: 1, unitWeight: 500, length: 48, width: 40, height: 48 }], services, ...(onlyProvider === undefined ? {} : { onlyProvider }) }) })) };
 }
 test('JSON and streaming API skip incompatible providers while other providers still quote', async () => {
   for (const stream of [false,true]) {
@@ -74,4 +74,27 @@ test('overlength rejection is visible even with zero rates and makes no carrier 
   assert.equal(response.status, 502);
   assert.match(data.error, /Overlength/);
   assert.equal(h.calls.length, 0);
+});
+
+
+test('isolated TQL diagnosis calls no other providers, in JSON and stream modes', async () => {
+  for (const stream of [false, true]) {
+    const h = routeHarness(), response = await h.post([], stream, 'tql');
+    const data = stream ? (await response.text()).trim().split('\n').map(JSON.parse).find(e => e.type === 'result').data : await response.json();
+    assert.deepEqual(h.calls, ['tql']); assert.equal(data.rates.length, 1);
+  }
+});
+test('isolated diagnosis is admin-only, rejects arbitrary selectors, and respects disabled TQL', async () => {
+  const customer = routeHarness({ role: 'customer' });
+  assert.equal((await customer.post([], false, 'tql')).status, 403); assert.equal(customer.calls.length, 0);
+  const admin = routeHarness();
+  assert.equal((await admin.post([], false, 'wwex')).status, 400); assert.equal(admin.calls.length, 0);
+  const disabled = routeHarness({ tqlEnabled: false });
+  await disabled.post([], false, 'tql'); assert.equal(disabled.calls.length, 0);
+});
+test('diagnosis exposes quote HTTP status without private carrier response text', async () => {
+  const h = routeHarness({ tqlFailure: true });
+  const data = await (await h.post([], false, 'tql')).json();
+  assert.match(data.error, /HTTP 400/); assert.doesNotMatch(data.error, /private carrier payload/);
+  assert.deepEqual(h.calls, ['tql']);
 });
