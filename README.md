@@ -256,4 +256,4 @@ Company Account 位于侧边栏 Settings（设置）分组下；原 Settings 入
 
 ### Priority1 Limited access 修复（2026-11-27）
 
-补上 Limited access → LTDDEL（Limited Access Delivery）的询价映射，保留尾门、住宅和预约等原有服务。不手工添加固定附加费，价格使用Priority1返回的总额。官方参考：https://api.priority1.com/about 。V2 dispatch按quoteId使用已定价的报价；旧的Limited access草稿缺少已正确询价的标记时，要求重新询价并在押金预留前阻止出单。已有待核对运单仍允许只核对、不重复下单。73项本地测试通过；正式接口价格对照未执行，需单独批准。无需SQL。
+补上 Limited access → LTDDEL（Limited Access Delivery）的询价映射，保留尾门、住宅和预约等原有服务。不手工添加固定附加费，价格使用Priority1返回的总额。官方参考：https://api.priority1.com/about 。V2 dispatch按quoteId使用已定价的报价；旧的Limited access草稿缺少已正确询价的标记时，要求重新询价并在押金预留前阻止出单。已有待核对运单仍允许只核对、不重复下单。73项本地测试通过；经用户批准，2026-11-27仅调用Priority1正式询价接口对照91710→76132、2026-11-30、1托、57×40×88英寸、1188lb、Class 92.5（可堆叠，通用品名），两组均含尾门派送和预约：Roadrunner由$496.40升至$546.40（+$50.00），Custom Companies由$479.19升至$549.74（+$70.55），与提供的Priority1截图一致。仅2次询价，未调用其他平台、未出单或调整押金。无需SQL。
