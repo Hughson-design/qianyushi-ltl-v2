@@ -9,7 +9,7 @@ function load(path, names, globals = {}) {
   return vm.runInNewContext(source + '\n;({' + names.join(',') + '})', { console, Buffer, Request, Response, URL, URLSearchParams, AbortSignal, Date, process: { env: {} }, ...globals });
 }
 const bookingErrors = load('src/lib/booking-errors.ts', ['NoShipmentSubmissionError','beforeShipmentSubmission','isNoShipmentSubmissionError','isTqlValidationRejection']);
-const safe = load('src/lib/booking-safety.ts', ['bookingParty', 'validateBooking', 'priority1BookingReference'], { formatPhoneNumber: s => s });
+const safe = load('src/lib/booking-safety.ts', ['bookingParty', 'validateBooking', 'priority1BookingReference'], { ...load('src/lib/carriers/service-support.ts', ['serviceMappingIssue']), formatPhoneNumber: s => s });
 const id = '12345678-1234-1234-1234-123456789abc';
 const party = { company: 'Test', contact: 'Test', country: 'United States', address1: '1 Test St', address2: '', zip: '90670', state: 'CA', city: 'Test', phone: '5572145975', extension: '', email: 'test@example.com' };
 test('booking contacts enforce required fields, lengths, ten digits, and discard injected fields', () => {

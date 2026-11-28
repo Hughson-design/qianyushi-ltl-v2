@@ -7,6 +7,7 @@ import { getPriority1Rates } from "@/lib/carriers/priority1";
 import { getTqlRates } from "@/lib/carriers/tql";
 import type { NormalizedRate, QuoteLineItem, QuoteLocation, QuoteRequest } from "@/lib/carriers/types";
 import { getWwexRates } from "@/lib/carriers/wwex";
+import { serviceMappingIssue } from "@/lib/carriers/service-support";
 import { supabaseRequest } from "@/lib/supabase-server";
 import { AppSession, requireAppSession } from "@/lib/auth-server";
 
@@ -188,6 +189,7 @@ async function quoteResponse(request: Request, emit?: (event: object) => void) {
       { id: "mothership", enabled: pricing.mothershipEnabled && mothershipRatesEnabled(), getRates: getMothershipRates },
     ] as const;
     const providerErrors: Record<string, string> = {};
+    const providerNotices: Record<string, string> = {};
     const batches = await Promise.all(providers.map(async ({ id, enabled, getRates }) => {
       if (!enabled) {
         emit?.({ type: "provider", id, status: "disabled" });
@@ -196,7 +198,18 @@ async function quoteResponse(request: Request, emit?: (event: object) => void) {
       const started = performance.now();
       emit?.({ type: "provider", id, status: "pending" });
       try {
+        const mappingIssue = serviceMappingIssue(id, quoteRequest.services);
+        if (mappingIssue) {
+          providerErrors[id] = mappingIssue;
+          providerNotices[id] = mappingIssue;
+          emit?.({ type: "provider", id, status: "failed", elapsedMs: Math.round(performance.now() - started) });
+          return [];
+        }
         const returned = await getRates(quoteRequest);
+        if (id === "mothership" && !returned.length && quoteRequest.services.includes("Residential delivery")) {
+          providerErrors[id] = "Mothership 未返回符合住宅及预约要求的报价；短信／邮件预约与电话预约不能同时请求。 / No compatible Mothership residential appointment rates; digital and phone appointments cannot be combined.";
+          providerNotices[id] = providerErrors[id];
+        }
         const rates = cheapestFive(returned.filter((rate) => Number.isFinite(rate.price) && rate.price > 0));
         emit?.({ type: "provider", id, status: rates.length ? "done" : "empty", elapsedMs: Math.round(performance.now() - started) });
         return rates;
@@ -210,12 +223,13 @@ async function quoteResponse(request: Request, emit?: (event: object) => void) {
     const rates = batches.flat().map((rate) => customerRate(rate, pricing.markupPercent, pricing.minimumMarkup)).sort((a, b) => a.price - b.price);
 
     if (rates.length === 0) {
-      return NextResponse.json({ error: "No rates were returned by the connected carriers.", providerErrors }, { status: 502 });
+      const details = Object.entries(providerNotices).map(([provider, message]) => `${provider.toUpperCase()}: ${message}`).join(" · ");
+      return NextResponse.json({ error: details || "No rates were returned by the connected carriers.", providerErrors, providerNotices }, { status: 502 });
     }
     return NextResponse.json({ rates: rates.map((rate) => ({
       ...rate,
       quoteToken: issueQuoteToken(customerId, rate, { originZip, destinationZip, readyDate, items: quoteRequest.items.map((item, index) => ({ ...item, unitWeight: Number(body.items[index].unitWeight) })), services: quoteRequest.services }),
-    })), providerErrors });
+    })), providerErrors, providerNotices });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to request rates." }, { status: 400 });
   }

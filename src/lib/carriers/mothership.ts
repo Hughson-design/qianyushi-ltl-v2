@@ -27,7 +27,7 @@ export async function getMothershipRates(input: QuoteRequest): Promise<Normalize
   const { token, base, sandbox } = mothershipConfig();
   if (!token) return [];
   if (input.items.some((item) => item.hazmat || !item.stackable || !Object.hasOwn(freightTypes, item.packaging) || item.declaredValue > 0) ||
-      input.services.some((service) => service === "Limited access" || service === "Overlength freight")) return [];
+      input.services.includes("Overlength freight")) return [];
 
   const pickup: string[] = [];
   const delivery: string[] = [];
@@ -35,7 +35,13 @@ export async function getMothershipRates(input: QuoteRequest): Promise<Normalize
   if (input.services.includes("Liftgate at delivery")) delivery.push("liftgate");
   if (input.services.includes("Residential pickup")) pickup.push("residential");
   if (input.services.includes("Residential delivery")) delivery.push("residential");
+  if (input.services.includes("Limited access")) delivery.push("limitedAccess");
   if (input.services.includes("Appointment delivery")) delivery.push("appointment");
+  const residential = input.services.includes("Residential delivery");
+  const phoneAppointment = input.services.includes("Appointment delivery");
+  // Digital residential appointments apply only to Mothership's own service.
+  // Never substitute them for an explicitly requested phone appointment.
+  if (residential && !phoneAppointment) delivery.push("scheduledDelivery");
 
   const response = await fetch(`${base}/quotes`, {
     method: "POST",
@@ -65,7 +71,11 @@ export async function getMothershipRates(input: QuoteRequest): Promise<Normalize
   const quote = result.data;
   if (!quote?.id || !Array.isArray(quote.rates)) throw new Error("Invalid Mothership quote response.");
 
-  return quote.rates.filter((rate) => rate.id && Number.isFinite(rate.price) && rate.price > 0).map((rate) => {
+  return quote.rates.filter((rate) => {
+    if (!rate.id || !Number.isFinite(rate.price) || rate.price <= 0) return false;
+    if (residential) return phoneAppointment ? rate.provider !== "mothership" : rate.provider === "mothership";
+    return true;
+  }).map((rate) => {
     const days = rate.transitDays?.maximum;
     return {
       provider: "mothership",

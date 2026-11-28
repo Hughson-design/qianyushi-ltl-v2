@@ -774,3 +774,14 @@ Shipment、Party 和 Provider Reference 使用 JSONB，便于适配多个承运�
 - 如何测试和回滚。
 
 任何扩大产品范围的需求，例如 Tracking、POD、Invoice 或 Rebill，都应先单独更新产品范围和数据模型，不能直接混入现有 BOL 流程。
+
+
+### 附加服务完整性修复（2026-11-27）
+
+询价按平台先检查服务能否完整表达：TQL/WWEX不再把“住宅派送＋Limited access”静默降级为住宅；TQL拒绝两端住宅。只跳过不支持的平台，其余平台继续返回报价；电脑和手机页面均显示明确原因，全部无报价时也显示原因。旧的此类草稿在新出单预留押金前被阻止，已有待核对运单仍可核对。
+
+Mothership新增delivery.limitedAccess。住宅未明确请求电话预约时发送residential＋scheduledDelivery，仅保留Mothership自营报价；明确勾选Appointment delivery时保留电话appointment，不混发scheduledDelivery，并排除需要数字预约的自营住宅报价，保留兼容的其他承运商报价。住宅提货不自动添加派送预约。Mothership仍仅比价，不支持本平台出单。
+
+Overlength freight在四个平台均暂停自动报价并提示人工核实，不再将勾选项静默忽略。虽然Priority1公开ELS_6至ELS_30等代码，但尚未确认长度区间及承运商计费规则，不凭代码名称推断，也不手工加固定费用。确认规则后再实现。未勾选超长时仍按原逻辑传递真实尺寸，此修复不保证所有尺寸条件的超长费均已核实。
+
+参考：Priority1 https://api.priority1.com/about；Mothership https://docs.mothership.com/reference/accessorials 及 https://docs.mothership.com/reference/createquote；TQL和WWEX使用其提供的接口说明与Postman样例。无需SQL。80项离线测试及完整构建通过；本次未向任何承运商发送真实询价或出单。

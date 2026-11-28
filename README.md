@@ -257,3 +257,14 @@ Company Account 位于侧边栏 Settings（设置）分组下；原 Settings 入
 ### Priority1 Limited access 修复（2026-11-27）
 
 补上 Limited access → LTDDEL（Limited Access Delivery）的询价映射，保留尾门、住宅和预约等原有服务。不手工添加固定附加费，价格使用Priority1返回的总额。官方参考：https://api.priority1.com/about 。V2 dispatch按quoteId使用已定价的报价；旧的Limited access草稿缺少已正确询价的标记时，要求重新询价并在押金预留前阻止出单。已有待核对运单仍允许只核对、不重复下单。73项本地测试通过；经用户批准，2026-11-27仅调用Priority1正式询价接口对照91710→76132、2026-11-30、1托、57×40×88英寸、1188lb、Class 92.5（可堆叠，通用品名），两组均含尾门派送和预约：Roadrunner由$496.40升至$546.40（+$50.00），Custom Companies由$479.19升至$549.74（+$70.55），与提供的Priority1截图一致。仅2次询价，未调用其他平台、未出单或调整押金。无需SQL。
+
+
+### 附加服务完整性修复（2026-11-27）
+
+询价按平台先检查服务能否完整表达：TQL/WWEX不再把“住宅派送＋Limited access”静默降级为住宅；TQL拒绝两端住宅。只跳过不支持的平台，其余平台继续返回报价；电脑和手机页面均显示明确原因，全部无报价时也显示原因。旧的此类草稿在新出单预留押金前被阻止，已有待核对运单仍可核对。
+
+Mothership新增delivery.limitedAccess。住宅未明确请求电话预约时发送residential＋scheduledDelivery，仅保留Mothership自营报价；明确勾选Appointment delivery时保留电话appointment，不混发scheduledDelivery，并排除需要数字预约的自营住宅报价，保留兼容的其他承运商报价。住宅提货不自动添加派送预约。Mothership仍仅比价，不支持本平台出单。
+
+Overlength freight在四个平台均暂停自动报价并提示人工核实，不再将勾选项静默忽略。虽然Priority1公开ELS_6至ELS_30等代码，但尚未确认长度区间及承运商计费规则，不凭代码名称推断，也不手工加固定费用。确认规则后再实现。未勾选超长时仍按原逻辑传递真实尺寸，此修复不保证所有尺寸条件的超长费均已核实。
+
+参考：Priority1 https://api.priority1.com/about；Mothership https://docs.mothership.com/reference/accessorials 及 https://docs.mothership.com/reference/createquote；TQL和WWEX使用其提供的接口说明与Postman样例。无需SQL。80项离线测试及完整构建通过；本次未向任何承运商发送真实询价或出单。

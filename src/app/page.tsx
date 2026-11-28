@@ -1175,7 +1175,13 @@ export default function Home() {
       }));
       setRates(withBadges);
       const failedProviders = Object.keys(data.providerErrors || {});
-      if (failedProviders.length) setQuoteMessage(`${failedProviders.join(" and ").toUpperCase()} did not return rates. Other available rates are shown.`);
+      if (failedProviders.length) {
+        const notices = data.providerNotices || {};
+        const messages = Object.entries(notices as Record<string, string>).map(([provider, message]) => `${provider.toUpperCase()}: ${message}`);
+        const otherFailures = failedProviders.filter(provider => !notices[provider]);
+        if (otherFailures.length) messages.push(`${otherFailures.join(" and ").toUpperCase()} did not return rates. Other available rates are shown.`);
+        setQuoteMessage(messages.join(" · "));
+      }
       setLoading(false);
       window.setTimeout(() => document.getElementById("rates")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     } catch (error) {

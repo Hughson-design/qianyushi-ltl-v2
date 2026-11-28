@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const { stripTypeScriptTypes } = require('node:module');
 function load(file, names, globals = {}) {
   const source = stripTypeScriptTypes(fs.readFileSync(file, 'utf8').replace(/^import .*;\r?\n/gm, '')).replace(/\bexport /g, '');
-  return vm.runInNewContext(source + ';({' + names + '})', { Response, Date, process: { env: { PRIORITY1_API_BASE: 'https://fixture.invalid', PRIORITY1_API_KEY: 'fixture' } }, ...globals });
+  return vm.runInNewContext(source + ';({' + names + '})', { Response, Date, serviceMappingIssue: (...args) => load('src/lib/carriers/service-support.ts', 'serviceMappingIssue').serviceMappingIssue(...args), process: { env: { PRIORITY1_API_BASE: 'https://fixture.invalid', PRIORITY1_API_KEY: 'fixture' } }, ...globals });
 }
 const input = { origin: { zip: '91710' }, destination: { zip: '76132' }, readyDate: '2026-11-30', items: [{ packaging: 'Pallet', pallets: 1, pieces: 1, totalWeight: 1188, length: 57, width: 40, height: 88, freightClass: '92.5' }] };
 test('Limited Access Delivery is sent alongside liftgate and appointment; full carrier totals pass through', async () => {
